@@ -1,14 +1,12 @@
-﻿import './index.css';
+import volumeSvg from './icons/tabler/volume.svg?raw';
+import { BulkPopover } from './renderer/bulk-popover';
+import { WindowControls } from './renderer/window-controls';
+import './index.css';
 import type { ClockStatus } from './shared/api';
 import type { Settings, Theme } from './shared/settings';
 import { ClockDial } from './renderer/clock-dial';
-import {
-  matchingPreset,
-  presetSlots,
-  type Preset,
-} from './renderer/dial-model';
-import { currentTime } from './renderer/current-time';
-import { nextChimeDisplay } from './renderer/next-chime';
+import { applyBulkSlots, type BulkAction, type Ring } from './renderer/dial-model';
+import { currentTime, nextChimeDisplay } from './renderer/clock-time';
 import { AppMenu } from './renderer/app-menu';
 import type { CreditLink } from './shared/credits';
 import { MyPresets } from './renderer/my-presets';
@@ -20,13 +18,15 @@ import './sound-controls.css';
 import './sound-select.css';
 import './ui-details.css';
 import {settingsFeedback} from './ui-feedback';
-import {WindowControls} from './renderer/window-controls';
 import {toast} from './renderer/toast';
 import {AudioFeedback} from './audio-feedback';
 const audioFeedback=new AudioFeedback();
-new WindowControls();
 const element = <T extends HTMLElement>(id: string): T =>
   document.getElementById(id) as T;
+element('volume-icon').innerHTML = volumeSvg;
+element('volume-icon').querySelector('svg')!.setAttribute('focusable', 'false');
+new WindowControls();
+const bulkPopover = new BulkPopover();
 const current = element<HTMLElement>('current');
 const currentDate = element<HTMLElement>('current-date');
 const next = element<HTMLElement>('next');
@@ -34,9 +34,7 @@ const nextDate = element<HTMLElement>('next-date');
 const settingsError = element<HTMLElement>('settings-error');
 const audioError = element<HTMLElement>('audio-error');
 const inputError = element<HTMLElement>('input-error');
-const displayMode = new DisplayMode(element('dial'), (error) => {
-  inputError.textContent = `表示サイズを変更できませんでした：${String(error)}`;
-});
+const displayMode = new DisplayMode();
 const test = element<HTMLButtonElement>('test');
 const fieldset = element<HTMLFieldSetElement>('settings');
 const enabled = element<HTMLButtonElement>('enabled');
@@ -109,14 +107,10 @@ const appMenu = new AppMenu(
   (enabled) => change({ backgroundIllustration: enabled }),
   chooseMinimum,
 );
+let displayedSlots: readonly boolean[] = Array(48).fill(false);
 function renderPresets(slots: readonly boolean[]): void {
+  displayedSlots = [...slots];
   myPresets.setSlots(slots);
-  const preset = matchingPreset(slots);
-  for (const button of presets)
-    button.setAttribute(
-      'aria-pressed',
-      String(button.dataset.preset === preset),
-    );
 }
 const dial = new ClockDial(
   element('dial'),
@@ -203,6 +197,7 @@ function ready(): void {
   clockMode.disabled = !editable;
   fieldset.disabled = !editable;
   dial.setDisabled(!editable);
+  bulkPopover.setWritable(editable);
   presets.forEach((button) => {
     button.disabled = !editable;
   });
@@ -258,7 +253,7 @@ for (const radio of [...repeats,...halfRepeats])
   });
 for (const button of presets)
   button.addEventListener('click', () => {
-    const slots = presetSlots(button.dataset.preset as Preset);
+    const slots = applyBulkSlots(displayedSlots, Number(button.dataset.ring ?? 0) as Ring, button.dataset.preset as BulkAction);
     dial.setSlots(slots);
     change({ slots });
   });

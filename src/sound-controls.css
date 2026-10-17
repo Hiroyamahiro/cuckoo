@@ -7,8 +7,9 @@
 .sound-warning,#sound-error {color:var(--error,#b54708);font-size:12px;overflow-wrap:anywhere;}
 .sound-warning:empty,#sound-error:empty,#sound-notice:empty {display:none;}
 #sound-management {margin-top:1rem;padding-top:18px;border-top:1px solid color-mix(in srgb,currentColor 20%,transparent);}
-#sound-management summary {cursor:pointer;font-size:14px;font-weight:500;}
-#sound-management p,#sound-notice {font-size:.85rem;line-height:1.6;}
+#sound-management summary {cursor:pointer;font-size:15px;font-weight:500;}
+#sound-management p,#sound-notice {line-height:1.6;}
+#sound-management p:not(.description),#sound-notice {font-size:.85rem;}
 #sound-rename-name {width:100%;box-sizing:border-box;font:inherit;font-size:13px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;margin:8px 0 12px;}
 #sound-rename-error {color:var(--error);font-size:12px;}
 .sound-remove svg {width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;display:block;}
@@ -16,12 +17,12 @@
 #custom-sounds li {display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.7rem 0;border-bottom:1px solid color-mix(in srgb,currentColor 15%,transparent);}
 #custom-sounds strong {font-size:13px;font-weight:500;flex:1 1 10rem;overflow-wrap:anywhere;}
 #custom-sounds span {flex:1 1 100%;font-size:12px;}
-.sound-actions {display:flex;gap:.5rem;justify-content:flex-end;margin-top:.75rem;flex-wrap:wrap;}
-.sound-panel button,.sound-actions button {font:inherit;font-size:var(--font-small);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--button-radius);padding:.45rem .65rem;cursor:pointer;}
-.sound-panel button:hover:not(:disabled),.sound-actions button:hover:not(:disabled) {background:var(--button-hover-background);}
+.sound-actions {display:flex;align-items:center;gap:.5rem;justify-content:flex-end;margin-top:.75rem;flex-wrap:wrap;}
+#test,.sound-panel button,.sound-actions button {font:inherit;font-size:var(--font-small);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--button-radius);padding:.45rem .65rem;cursor:pointer;}
+#test:hover:not(:disabled),.sound-panel button:hover:not(:disabled),.sound-actions button:hover:not(:disabled) {background:var(--button-hover-background);}
 @media(max-width:540px){.sound-route{grid-template-columns:1fr auto;}.sound-route label{grid-column:1/-1;}}
 
-#volume-value {font-size:13px;font-weight:400;}
+
 #sound-management > button {margin-top:8px;}
 .sound-route + .sound-warning + .sound-route {margin-top:8px;}
 #operation-toast {position:fixed;inset:auto 16px 20px;margin:0 auto;max-width:440px;width:max-content;box-sizing:border-box;padding:10px 16px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);box-shadow:0 4px 18px #0002;font-size:13px;line-height:1.5;overflow-wrap:anywhere;pointer-events:none;}
@@ -31,3 +32,6 @@
 .tone-repeat {margin:8px 0 16px;padding-left:7.5rem;}
 .tone-repeat .repeat-options {margin-left:0;}
 @media(max-width:540px){.tone-repeat{padding-left:0;}}
+
+.sound-actions[hidden],.sound-actions button[hidden] {display:none;}
+.sound-actions p {flex-basis:100%;margin:0;color:var(--muted);font-size:var(--font-caption);line-height:1.6;}

@@ -746,10 +746,11 @@ checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
 
 [[package]]
 name = "cuckoo"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "chrono",
  "rodio",
+ "semver",
  "serde",
  "serde_json",
  "sha2",

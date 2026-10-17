@@ -1,14 +1,9 @@
 #settings-error[data-tone='saving'],#settings-error[data-tone='neutral'] {color:var(--muted);font-size:var(--font-caption);}
 :root[data-minimum='true'] #settings-error[data-tone='saving'] {display:none;}
-.sound-actions[hidden],.sound-actions button[hidden] {display:none;}
-.sound-actions {align-items:center;}
-.sound-actions p {flex-basis:100%;margin:0;color:var(--muted);font-size:var(--font-caption);line-height:1.6;}
-.window-titlebar {display:flex;align-items:center;z-index:1000;color:var(--text);user-select:none;}
+.window-titlebar {position:fixed;top:0;left:0;right:0;height:var(--titlebar-height);background:transparent;-webkit-app-region:drag;display:flex;align-items:center;z-index:1000;color:var(--text);user-select:none;}
 #window-caption {flex:1;height:100%;display:flex;align-items:center;padding-left:12px;font-size:12px;min-width:0;}
-.window-titlebar button {height:32px;width:46px;flex-shrink:0;padding:0;border:0;border-radius:0;display:grid;place-items:center;background:transparent;color:inherit;-webkit-app-region:no-drag;}
+.window-titlebar button {height:100%;width:46px;flex-shrink:0;padding:0;border:0;border-radius:0;display:grid;place-items:center;background:transparent;color:inherit;-webkit-app-region:no-drag;}
 .window-titlebar svg {width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1;}
 .window-titlebar button:hover {background:color-mix(in srgb,var(--text) 12%,transparent);}
 .window-titlebar button:focus-visible {outline:2px solid var(--accent);outline-offset:-3px;}
 #window-close:hover {background:#c42b1c;color:#fff;}
-.restore-icon,.is-maximized .maximize-icon {display:none;}
-.is-maximized .restore-icon {display:block;}

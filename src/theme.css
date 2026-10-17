@@ -1,0 +1,49 @@
+﻿@font-face {
+  font-family: 'Urbanist';
+  src: url('./fonts/urbanist/Urbanist-Variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --font-family: 'Urbanist', 'Yu Gothic UI', 'Segoe UI', sans-serif;
+  --titlebar-height: 32px;
+  --dial-max-size: 500px;
+  color-scheme: light;
+  --font-medium: 16px;
+  --font-small: 13px;
+  --font-caption: 12px;
+  --button-hover-background: var(--accent-soft);
+  --button-radius: 5px;
+  --button-transition: background-color 120ms ease;
+  --background: #fafaf8;
+  --forest-background: #ffffff;
+  --surface: #ffffff;
+  --text: #303734;
+  --muted: #6c746f;
+  --border: #e2e5e0;
+  --ring: #c0c5be;
+  --dot-off: #c0c5be;
+  --half-off: #c0c5be;
+  --accent: #1e804a;
+  --accent-soft: #edf2eb;
+  --error: #ad3434;
+  --power-on-ink: var(--accent);
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #1f1f1f;
+  --forest-background: #181818;
+  --surface: #2c2c2c;
+  --text: #e7ece5;
+  --muted: #a0aaa1;
+  --border: #39413b;
+  --ring: #465048;
+  --dot-off: #465048;
+  --half-off: #465048;
+  --accent: #30a574;
+  --accent-soft: #303c31;
+  --error: #ffadad;
+  --power-on-ink: color-mix(in srgb, var(--accent) 58%, var(--text));
+}

@@ -1,20 +1,4 @@
-﻿import type { Settings, SaveState } from './settings';
-export const channels = {
-  status: 'cuckoo:status',
-  changed: 'cuckoo:changed',
-  enabled: 'cuckoo:enabled',
-  settings: 'cuckoo:settings',
-  preset: 'cuckoo:preset',
-  test: 'cuckoo:test',
-  audioReady: 'cuckoo:audio-ready',
-  audioPlay: 'cuckoo:audio-play',
-  audioCancel: 'cuckoo:audio-cancel',
-  audioResult: 'cuckoo:audio-result',
-  credit: 'cuckoo:credit',
-  appearance: 'cuckoo:appearance',
-  displayHeight: 'cuckoo:display-height',
-  fallbackQuit: 'cuckoo:fallback-quit',
-} as const;
+import type { Settings, SaveState } from './settings';
 export interface ClockStatus {
   nativeDisplayError?:string;
   soundManagement?: {eventSeq:number;busy:boolean;operation:{requestId:string;outcome:SoundOutcome}|null};
@@ -61,6 +45,9 @@ export interface Playback {
   repeat: 1 | 2;
 }
 export interface CuckooApi {
+  getUpdateStatus(): Promise<UpdateStatus>;
+  updateAction(action: 'check' | 'install' | 'cancel'): Promise<void>;
+  onUpdateStatus(callback: (status: UpdateStatus) => void): () => void;
   windowAction(action:'state'|'drag'|'minimize'|'maximize'|'close'):Promise<{maximized:boolean}>;
   soundConfirmationPending():boolean;
   listSources():Promise<SoundList>;
@@ -76,9 +63,16 @@ export interface CuckooApi {
   ): Promise<{ status: ClockStatus; id: string }>;
   test(): Promise<void>;
   openCredit(link: import('./credits').CreditLink): Promise<void>;
-  setAppearance(appearance: import('./appearance').Appearance): Promise<void>;
-  fitMinimumDisplay(height: number): Promise<void>;
+  setAppearance(appearance: 'light' | 'dark'): Promise<void>;
   quitIfTrayUnavailable(): Promise<void>;
+}
+export interface UpdateStatus {
+  seq: number;
+  phase: 'idle' | 'checking' | 'available' | 'downloading' | 'launched';
+  version: string | null;
+  received: number;
+  total: number;
+  message: string;
 }
 export type SoundAction={type:'select';target:'hour'|'halfHour';soundId:string}|{type:'register'}|{type:'rename';id:string;name:string}|{type:'unregister';id:string};
 export interface SoundOutcome {state:'pending'|'saved'|'failed'|'rejected'|'cancelled';id?:string;code?:string;uncertain?:boolean}

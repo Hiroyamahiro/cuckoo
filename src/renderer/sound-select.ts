@@ -1,7 +1,7 @@
-import bird from '../icons/tabler/brand-twitter.svg?raw';
+import bird from '../icons/tabler/canary.svg?raw';
 import church from '../icons/tabler/building-church.svg?raw';
 import clock from '../icons/pendulum-clock.svg?raw';
-import bell from '../icons/tabler/bell.svg?raw';
+import bell from '../icons/tabler/school-bell.svg?raw';
 import music from '../icons/tabler/music.svg?raw';
 
 function icon(id:string):SVGElement {
@@ -61,8 +61,9 @@ export class CustomSelect {
  private show():void{
   if(this.button.matches(':disabled'))return;
   this.open=true;this.popup.showPopover();this.button.setAttribute('aria-expanded','true');
-  const r=this.button.getBoundingClientRect();const height=Math.min(this.popup.scrollHeight,280,innerHeight-16);
-  this.popup.style.width=Math.min(Math.max(r.width,220),innerWidth-16)+'px';
+  const r=this.button.getBoundingClientRect();
+  this.popup.style.setProperty('--trigger-width',r.width+'px');
+  const height=this.popup.getBoundingClientRect().height;
   this.popup.style.left=Math.max(8,Math.min(r.left,innerWidth-this.popup.offsetWidth-8))+'px';
   this.popup.style.top=(innerHeight-r.bottom>=height+8?r.bottom+4:Math.max(8,r.top-height-4))+'px';
   this.active=this.select.selectedIndex;if(this.select.options[this.active]?.disabled)this.active=this.enabled()[0]??-1;

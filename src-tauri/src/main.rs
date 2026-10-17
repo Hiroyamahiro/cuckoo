@@ -1,9 +1,15 @@
+﻿#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod tray_panel;
+mod updates;
+mod update_http;
 mod audio;
 mod builtin_audio;
 mod external_links;
 mod lifecycle;
 mod mp3_decode;
 mod native_display;
+mod native_frame;
 mod scheduler;
 mod settings;
 mod settings_disk;
@@ -21,11 +27,11 @@ use std::{
     thread,
 };
 use tauri::{
-    menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager,
 };
 struct State {
+    updates: Arc<updates::Service>,
     sound_ops: sound_ui::Operations,
     // Lazy Rust-only management service; independent of WebView lifetimes.
     _sound_library: sound_library::Service,
@@ -123,6 +129,25 @@ async fn open_credit(
     link: String,
 ) -> Result<(), String> {
     current_window(&app, &window)?;
+    if link == "notices" {
+        if let Some(notices) = app.get_webview_window("third-party-notices") {
+            notices.unminimize().map_err(|e| e.to_string())?;
+            notices.show().map_err(|e| e.to_string())?;
+            return notices.set_focus().map_err(|e| e.to_string());
+        }
+        let builder = tauri::WebviewWindowBuilder::new(
+            &app,
+            "third-party-notices",
+            tauri::WebviewUrl::App("THIRD-PARTY-NOTICES.html".into()),
+        )
+        .title("Cuckoo - Third-party licenses")
+        .inner_size(800.0, 640.0)
+        .min_inner_size(400.0, 300.0);
+        #[cfg(feature = "settings-test-harness")]
+        let builder = builder.data_directory(settings_disk::verification_root().join("EBWebView"));
+        builder.build().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
     external_links::target(&link)?;
     tauri::async_runtime::spawn_blocking(move || external_links::open(&link))
         .await
@@ -148,6 +173,9 @@ async fn window_action(
     let target = app.clone();
     app.run_on_main_thread(move || {
         let result = current_window(&target, &window).and_then(|_| {
+            if !matches!(action, WindowAction::State) {
+                native_display::settle(&target, &window)?;
+            }
             match action {
                 WindowAction::State => (),
                 WindowAction::Drag => window.start_dragging().map_err(|e| e.to_string())?,
@@ -170,31 +198,6 @@ async fn window_action(
     tauri::async_runtime::spawn_blocking(move || {
         rx.recv()
             .map_err(|_| "ウィンドウ操作の結果を確認できません。".to_string())?
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-#[tauri::command]
-async fn fit_minimum_display(
-    app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
-    height: f64,
-) -> Result<(), String> {
-    native_display::valid_height(height)?;
-    current_window(&app, &window)?;
-    let (tx, rx) = std::sync::mpsc::channel();
-    let target = app.clone();
-    app.run_on_main_thread(move || {
-        let result = current_window(&target, &window)
-            .and_then(|_| native_display::fit(&target, &window, height));
-        let state = target.state::<Arc<State>>();
-        *state.display_error.lock().unwrap() = result.as_ref().err().cloned().unwrap_or_default();
-        let _ = tx.send(result);
-    })
-    .map_err(|e| e.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || {
-        rx.recv_timeout(std::time::Duration::from_secs(5))
-            .map_err(|_| "表示変更の完了を確認できません。".to_string())?
     })
     .await
     .map_err(|e| e.to_string())?
@@ -571,7 +574,7 @@ fn show_on_ui(app: &tauri::AppHandle) {
     match result {
         Ok(w) => {
             let native = if create {
-                native_display::attach(app, &w)
+                native_frame::install(app, &w).and_then(|_| native_display::attach(app, &w))
             } else {
                 native_display::sync(app, &w)
             };
@@ -637,6 +640,7 @@ fn store_on_ui(app: &tauri::AppHandle) {
     };
     if let Some(label) = target.0 {
         if let Some(w) = app.get_webview_window(&label) {
+            let _ = native_display::settle(app, &w);
             if let Ok(o) = native_display::observed(&w) {
                 state.display.lock().unwrap().observe(w.label(), o);
             }
@@ -686,6 +690,7 @@ fn shutdown(app: &tauri::AppHandle) {
     if state.quit_pending.swap(true, Ordering::SeqCst) {
         return;
     }
+    state.updates.cancel();
     state.settings.closing(true);
     changed(app, &state);
     let st = state.inner().clone();
@@ -745,34 +750,6 @@ fn native_dialog(text: &str, flags: u32) -> i32 {
         )
     }
 }
-fn recover_settings(app: &tauri::AppHandle) {
-    let app = app.clone();
-    thread::spawn(move || {
-        let st = app.state::<Arc<State>>();
-        let status = st.settings.status();
-        let sync = &status["settingsSync"];
-        if sync["canRestore"] != true {
-            native_dialog("現在はバックアップ復旧できません。保存中の場合は完了を待ち、成否不明の場合は再起動して確認してください。",0);
-            return;
-        }
-        let Some(candidate) = sync["backupCandidates"].as_array().and_then(|a| a.first()) else {
-            native_dialog("検証済みバックアップはありません。", 0);
-            return;
-        };
-        let text=format!("検証済みバックアップ（保存世代 {}）から復旧しますか？ 現在の設定は退避し、復旧内容を新しい世代として保存します。未保存の変更は置き換わります。",candidate["generation"]);
-        if native_dialog(&text, windows_sys::Win32::UI::WindowsAndMessaging::MB_YESNO)
-            == windows_sys::Win32::UI::WindowsAndMessaging::IDYES
-        {
-            if let Err(e) = st.settings.restore(
-                sync["sessionId"].as_str().unwrap(),
-                sync["revision"].as_u64().unwrap(),
-                candidate["token"].as_str().unwrap(),
-            ) {
-                native_dialog(&format!("復旧要求に失敗しました：{e}"), 0);
-            }
-        }
-    });
-}
 #[tauri::command]
 fn quit(app: tauri::AppHandle) {
     shutdown(&app)
@@ -783,8 +760,11 @@ fn main() {
         .expect("Application identifier mismatch");
     let options = lifecycle::options(&std::env::args().collect::<Vec<_>>())
         .expect("Invalid T2-B2 experiment options");
+    if !matches!(options.action, lifecycle::Action::Quit) && std::env::current_exe().map(|p| updates::installation_busy(&p)).unwrap_or(true) { return; }
+    let initial_quit = matches!(options.action, lifecycle::Action::Quit);
     let sound_library = sound_library::Service::default();
     let state = Arc::new(State {
+        updates: Arc::new(updates::Service::default()),
         sound_ops: Default::default(),
         _sound_library: sound_library.clone(),
         settings: Arc::new(settings::MemorySettings::default()),
@@ -833,12 +813,14 @@ fn main() {
                 sound_commands::audio_library_operation,
                 sound_commands::audio_library_receipt,
                 sound_commands::preview_audio_source,
+                tray_panel::tray_panel_action,
                 get_status,
                 update_settings,
                 edit_preset,
                 select_audio_source,
                 open_credit,
-                fit_minimum_display,
+                updates::update_status,
+                updates::update_action,
                 window_action,
                 retry_settings,
                 restore_settings,
@@ -848,93 +830,18 @@ fn main() {
             ];
             handler(invoke)
         })
-        .setup(|app| {
-            let open = MenuItem::with_id(app, "open", "設定を開く", true, None::<&str>)?;
-            let test = MenuItem::with_id(app, "test", "テスト再生", true, None::<&str>)?;
-            let toggle = MenuItem::with_id(app, "toggle", "時報 ON/OFF", true, None::<&str>)?;
-            let exit = MenuItem::with_id(app, "quit", "終了", true, None::<&str>)?;
-            let retry = MenuItem::with_id(
-                app,
-                "settings-retry",
-                "設定保存を再試行",
-                true,
-                None::<&str>,
-            )?;
-            let recover = MenuItem::with_id(
-                app,
-                "settings-recover",
-                "バックアップから設定を復旧",
-                true,
-                None::<&str>,
-            )?;
-            #[cfg(feature = "settings-test-harness")]
-            let hide_mode =
-                MenuItem::with_id(app, "mode-hide", "検証: 非表示方式", true, None::<&str>)?;
-            #[cfg(feature = "settings-test-harness")]
-            let destroy_mode = MenuItem::with_id(
-                app,
-                "mode-destroy",
-                "検証: 破棄・再生成方式",
-                true,
-                None::<&str>,
-            )?;
-            let menu = Menu::with_items(
-                app,
-                &[
-                    &open,
-                    &test,
-                    &toggle,
-                    &retry,
-                    &recover,
-                    &exit,
-                ],
-            )?;
-            #[cfg(feature = "settings-test-harness")]
-            { menu.append(&hide_mode)?; menu.append(&destroy_mode)?; }
+        .setup(move |app| {
             TrayIconBuilder::new()
                 .tooltip("Cuckoo")
                 .icon(tauri::image::Image::from_bytes(include_bytes!(
                     "../../assets/icons/app/cuckoo-app.ico"
                 ))?)
-                .menu(&menu)
                 .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| {
-                    let state = app.state::<Arc<State>>();
-                    match event.id().as_ref() {
-                        "open" => show(app),
-                        "quit" => shutdown(app),
-                        "mode-hide" => set_mode(app, lifecycle::Mode::Hide),
-                        "mode-destroy" => set_mode(app, lifecycle::Mode::Destroy),
-                        "test" => {
-                            let st = state.inner().clone();
-                            tauri::async_runtime::spawn(async move {
-                                let s = st.settings.snapshot();
-                                if scheduler::next(Local::now(), &s)
-                                    .map(|n| n - Local::now().timestamp_millis() > 3000)
-                                    .unwrap_or(true)
-                                {
-                                    if let Err(e) =
-                                        play(&st, s["hourlyRepeat"].as_u64().unwrap_or(2))
-                                    {
-                                        eprintln!("{e}")
-                                    }
-                                }
-                            });
-                        }
-                        "settings-retry" => {
-                            let _ = state.settings.retry();
-                        }
-                        "settings-recover" => recover_settings(app),
-                        "toggle" => {
-                            if let Err(e) = state.settings.toggle() {
-                                eprintln!("settings: {e}")
-                            }
-                            changed(app, &state);
-                        }
-                        _ => (),
-                    }
-                })
                 .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { button: MouseButton::Right, button_state: MouseButtonState::Up, position, .. } = &event {
+                        tray_panel::open(tray.app_handle(), *position);
+                        return;
+                    }
                     if matches!(
                         event,
                         TrayIconEvent::Click {
@@ -1037,10 +944,12 @@ fn main() {
                 }
             }
             eprintln!("BACKEND_READY");
-            show(app.handle());
+            if initial_quit { shutdown(app.handle()); } else { updates::start(app.handle()); show(app.handle()); }
             Ok(())
         })
-        .on_window_event(|window, event| match event {
+        .on_window_event(|window, event| {
+            if window.label() == tray_panel::LABEL || window.label() == "third-party-notices" { return; }
+            match event {
             tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
                 let app = window.app_handle();
                 if let Some(w) = app.get_webview_window(window.label()) {
@@ -1054,7 +963,15 @@ fn main() {
                 }
             }
             tauri::WindowEvent::ScaleFactorChanged { .. } => {
-                let _ = window.emit("native-display-refit", ());
+                let app = window.app_handle();
+                if let Some(w) = app.get_webview_window(window.label()) {
+                    let target = app.clone();
+                    let _ = app.run_on_main_thread(move || {
+                        let result = native_display::fit(&target, &w);
+                        *target.state::<Arc<State>>().display_error.lock().unwrap() =
+                            result.err().unwrap_or_default();
+                    });
+                }
             }
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
@@ -1074,6 +991,7 @@ fn main() {
                 }
             }
             _ => (),
+            }
         })
         .build(context)
         .expect("Tauri startup failed")

@@ -1,6 +1,10 @@
-; Tauri CLI v2.12.3 standard NSIS template; see licenses/third-party/TAURI-NSIS-MIT.txt
+; Tauri CLI v2.12.3 standard NSIS template; see THIRD-PARTY-NOTICES.html
 ; Local changes: separate installation/registry namespace; preserve foreign shortcuts/autostart.
 Unicode true
+; Internal engine only: the independent native setup owns all user interaction.
+SilentInstall silent
+SilentUnInstall silent
+AutoCloseWindow true
 ManifestDPIAware true
 ; Add in `dpiAwareness` `PerMonitorV2` to manifest for Windows 10 1607+ (note this should not affect lower versions since they should be able to ignore this and pick up `dpiAware` `true` set by `ManifestDPIAware true`)
 ; Currently undocumented on NSIS's website but is in the Docs folder of source tree, see
@@ -71,7 +75,6 @@ ${StrLoc}
 !define MANUPRODUCTKEY "${MANUKEY}\${BUNDLEID}"
 !define UNINSTALLERSIGNCOMMAND "{{uninstaller_sign_cmd}}"
 !define ESTIMATEDSIZE "{{estimated_size}}"
-!define STARTMENUFOLDER "{{start_menu_folder}}"
 
 Var PassiveMode
 Var UpdateMode
@@ -400,15 +403,7 @@ FunctionEnd
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_DIRECTORY
 
-; 6. Start menu shortcut page
-Var AppStartMenuFolder
-!if "${STARTMENUFOLDER}" != ""
-  !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
-  !define MUI_STARTMENUPAGE_DEFAULTFOLDER "${STARTMENUFOLDER}"
-!else
-  !define MUI_PAGE_CUSTOMFUNCTION_PRE Skip
-!endif
-!insertmacro MUI_PAGE_STARTMENU Application $AppStartMenuFolder
+; Start menu registration is automatic; one shortcut is placed directly in Programs.
 
 ; 7. Installation page
 !insertmacro MUI_PAGE_INSTFILES
@@ -660,7 +655,7 @@ Section Install
     !insertmacro NSIS_HOOK_PREINSTALL
   !endif
 
-  !insertmacro CheckIfAppIsRunning "$INSTDIR\${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+  !insertmacro CuckooRequireStopped
 
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
@@ -737,9 +732,7 @@ Section Install
   !endif
 
   ; Create start menu shortcut
-  !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
-    Call CreateOrUpdateStartMenuShortcut
-  !insertmacro MUI_STARTMENU_WRITE_END
+  Call CreateOrUpdateStartMenuShortcut
 
   ; Create desktop shortcut for silent and passive installers
   ; because finish page will be skipped
@@ -797,7 +790,7 @@ Section Uninstall
     !insertmacro NSIS_HOOK_PREUNINSTALL
   !endif
 
-  !insertmacro CheckIfAppIsRunning "$INSTDIR\${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+  !insertmacro CuckooRequireStopped
 
   ; Delete the app directory and its content from disk
   ; Copy main executable
@@ -841,20 +834,27 @@ Section Uninstall
   ${If} $UpdateMode <> 1
     !insertmacro DeleteAppUserModelId
 
-    ; Remove start menu shortcut
-    !insertmacro MUI_STARTMENU_GETFOLDER Application $AppStartMenuFolder
-    !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    Pop $0
-    ${If} $0 = 1
-      !insertmacro UnpinShortcut "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
-      Delete "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
-      RMDir "$SMPROGRAMS\$AppStartMenuFolder"
-    ${EndIf}
+    ; Remove only shortcuts targeting this installation.
     !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
     Pop $0
     ${If} $0 = 1
       !insertmacro UnpinShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk"
       Delete "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+    ${EndIf}
+    !insertmacro IsShortcutTarget "$SMPROGRAMS\Cuckoo\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+    Pop $0
+    ${If} $0 = 1
+      !insertmacro UnpinShortcut "$SMPROGRAMS\Cuckoo\${PRODUCTNAME}.lnk"
+      Delete "$SMPROGRAMS\Cuckoo\${PRODUCTNAME}.lnk"
+      RMDir "$SMPROGRAMS\Cuckoo"
+    ${EndIf}
+    !insertmacro IsShortcutTarget "$SMPROGRAMS\Hiroyama Hiroshi\Cuckoo\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+    Pop $0
+    ${If} $0 = 1
+      !insertmacro UnpinShortcut "$SMPROGRAMS\Hiroyama Hiroshi\Cuckoo\${PRODUCTNAME}.lnk"
+      Delete "$SMPROGRAMS\Hiroyama Hiroshi\Cuckoo\${PRODUCTNAME}.lnk"
+      RMDir "$SMPROGRAMS\Hiroyama Hiroshi\Cuckoo"
+      RMDir "$SMPROGRAMS\Hiroyama Hiroshi"
     ${EndIf}
 
     ; Remove desktop shortcuts
@@ -883,23 +883,7 @@ Section Uninstall
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${BUNDLEID}"
   ${EndIf}
 
-  ; Delete app data if the checkbox is selected
-  ; and if not updating
-  ${If} $DeleteAppDataCheckboxState = 1
-  ${AndIf} $UpdateMode <> 1
-    ; Clear the install location $INSTDIR from registry
-    DeleteRegKey SHCTX "${MANUPRODUCTKEY}"
-    DeleteRegKey /ifempty SHCTX "${MANUKEY}"
-
-    ; Clear the install language from registry
-    DeleteRegValue HKCU "${MANUPRODUCTKEY}" "Installer Language"
-    DeleteRegKey /ifempty HKCU "${MANUPRODUCTKEY}"
-    DeleteRegKey /ifempty HKCU "${MANUKEY}"
-
-    SetShellVarContext current
-    RmDir /r "$APPDATA\${BUNDLEID}"
-    RmDir /r "$LOCALAPPDATA\${BUNDLEID}"
-  ${EndIf}
+  ; User settings and registered audio are deliberately never deleted.
 
   !ifmacrodef NSIS_HOOK_POSTUNINSTALL
     !insertmacro NSIS_HOOK_POSTUNINSTALL
@@ -930,45 +914,32 @@ Function un.SkipIfPassive
 FunctionEnd
 
 Function CreateOrUpdateStartMenuShortcut
-  ; We used to use product name as MAINBINARYNAME
-  ; migrate old shortcuts to target the new MAINBINARYNAME
-  StrCpy $R0 0
-
-  !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
+  ; Retire legacy folders only for links targeting this installation.
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\Cuckoo\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
   Pop $0
   ${If} $0 = 1
-    !insertmacro SetShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    StrCpy $R0 1
+    !insertmacro UnpinShortcut "$SMPROGRAMS\Cuckoo\${PRODUCTNAME}.lnk"
+    Delete "$SMPROGRAMS\Cuckoo\${PRODUCTNAME}.lnk"
+    RMDir "$SMPROGRAMS\Cuckoo"
   ${EndIf}
-
-  !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\Hiroyama Hiroshi\Cuckoo\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
   Pop $0
   ${If} $0 = 1
-    !insertmacro SetShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    StrCpy $R0 1
+    !insertmacro UnpinShortcut "$SMPROGRAMS\Hiroyama Hiroshi\Cuckoo\${PRODUCTNAME}.lnk"
+    Delete "$SMPROGRAMS\Hiroyama Hiroshi\Cuckoo\${PRODUCTNAME}.lnk"
+    RMDir "$SMPROGRAMS\Hiroyama Hiroshi\Cuckoo"
+    RMDir "$SMPROGRAMS\Hiroyama Hiroshi"
   ${EndIf}
-
-  ${If} $R0 = 1
+  ; Do not overwrite another application's same-name shortcut.
+  IfFileExists "$SMPROGRAMS\${PRODUCTNAME}.lnk" 0 cuckoo_create_start_link
+  !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+  Pop $0
+  ${If} $0 <> 1
     Return
   ${EndIf}
-
-  ; Skip creating shortcut if in update mode or no shortcut mode
-  ; but always create if migrating from wix
-  ${If} $WixMode = 0
-    ${If} $UpdateMode = 1
-    ${OrIf} $NoShortcutMode = 1
-      Return
-    ${EndIf}
-  ${EndIf}
-
-  !if "${STARTMENUFOLDER}" != ""
-    CreateDirectory "$SMPROGRAMS\$AppStartMenuFolder"
-    CreateShortcut "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
-  !else
-    CreateShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\${PRODUCTNAME}.lnk"
-  !endif
+  cuckoo_create_start_link:
+  CreateShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+  !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\${PRODUCTNAME}.lnk"
 FunctionEnd
 
 Function CreateOrUpdateDesktopShortcut

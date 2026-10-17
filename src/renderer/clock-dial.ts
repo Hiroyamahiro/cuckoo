@@ -1,5 +1,6 @@
 ﻿import {
   dialSize,
+  dialCenter,
   hitHour,
   paintHours,
   point,
@@ -29,19 +30,19 @@ export class ClockDial {
     svg.setAttribute('aria-hidden', 'true');
     for (const radius of [ringRadius(0), ringRadius(1)]) {
       const circle = document.createElementNS(svg.namespaceURI, 'circle');
-      circle.setAttribute('cx', '260');
-      circle.setAttribute('cy', '260');
+      circle.setAttribute('cx', String(dialCenter));
+      circle.setAttribute('cy', String(dialCenter));
       circle.setAttribute('r', String(radius));
       svg.append(circle);
     }
     this.hand = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     this.hand.classList.add('current-hand');
     for (const [name, value] of Object.entries({
-      x1: '260',
+      x1: String(dialCenter),
       // 中央の情報表示を避け、半径80pxから針を描く。
-      y1: '180',
-      x2: '260',
-      y2: '128',
+      y1: String(dialCenter - 80),
+      x2: String(dialCenter),
+      y2: String(dialCenter - 132),
     }))
       this.hand.setAttribute(name, value);
     svg.append(this.hand);
@@ -146,7 +147,7 @@ export class ClockDial {
     for (const button of this.buttons) button.disabled = disabled;
   }
   setAngle(angle: number): void {
-    this.hand.setAttribute('transform', `rotate(${angle} 260 260)`);
+    this.hand.setAttribute('transform', `rotate(${angle} ${dialCenter} ${dialCenter})`);
     this.hand.dataset.angle = String(angle);
   }
   private paint(): void {

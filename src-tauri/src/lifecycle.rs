@@ -42,7 +42,9 @@ pub fn options(args: &[String]) -> Result<Options, String> {
         if !cfg!(any(test, feature = "settings-test-harness")) && a.starts_with("--t2b") {
             return Err("Verification options are unavailable in release builds".into());
         }
-        if let Some(v) = a.strip_prefix("--t2b2-window-mode=") {
+        if a == "--request-update-exit" {
+            o.action = Action::Quit;
+        } else if let Some(v) = a.strip_prefix("--t2b2-window-mode=") {
             o.mode = Some(match v {
                 "hide" => Mode::Hide,
                 "destroy" => Mode::Destroy,

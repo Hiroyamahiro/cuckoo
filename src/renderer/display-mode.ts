@@ -1,50 +1,31 @@
 export class DisplayMode {
   private minimum: boolean | undefined;
-  private measurement = 0;
-  private dimensions = '';
   private fade: Animation | undefined;
+  private movement: Animation | undefined;
+  private readonly dial = document.querySelector<HTMLElement>('#dial')!;
   private readonly controls =
     document.querySelector<HTMLElement>('#normal-controls')!;
   private readonly motion = window.matchMedia(
     '(prefers-reduced-motion: reduce)',
   );
-  constructor(
-    private readonly dial: HTMLElement,
-    private readonly report: (error: unknown) => void,
-  ) {
-    const observer = new ResizeObserver(() => {
-      const dimensions = `${Math.round(dial.getBoundingClientRect().width)}:${this.contentTop()}`;
-      if (dimensions !== this.dimensions) {
-        this.dimensions = dimensions;
-
-        this.fit();
-      }
-    });
-    observer.observe(dial);
-    observer.observe(document.querySelector('header')!);
-    const refit=()=>this.fit();
-    window.addEventListener('native-display-refit',refit);
+  constructor() {
     this.motion.addEventListener('change', () => {
       this.fade?.cancel();
+      this.movement?.cancel();
 
       this.controls.hidden = this.minimum === true;
     });
     window.addEventListener('unload', () => {
-      observer.disconnect();
-      window.removeEventListener('native-display-refit',refit);
-      this.measurement++;
       this.fade?.cancel();
+      this.movement?.cancel();
     });
-  }
-  private contentTop(): number {
-    return Math.ceil(
-      document.querySelector('header')!.getBoundingClientRect().bottom,
-    );
   }
   setMode(minimum: boolean): void {
     if (minimum === this.minimum) return;
     const initial = this.minimum === undefined;
 
+    const before = !initial && !this.motion.matches ? this.dial.getBoundingClientRect() : undefined;
+    this.movement?.cancel();
     this.fade?.cancel();
 
     if (minimum)
@@ -63,12 +44,31 @@ export class DisplayMode {
     document.querySelector('#display-mode-hint')!.textContent = minimum
       ? '通常表示に戻す'
       : 'ミニマム表示に切り替える';
+    button.setAttribute('data-tooltip', document.querySelector('#display-mode-hint')!.textContent!);
     window.scrollTo(0, 0);
+    if (before) {
+      // Preserve the visible bounds across the mode's layout change. This
+      // offsets centering in the still-large viewport while Windows resizes.
+      const after = this.dial.getBoundingClientRect();
+      const dx = before.x + before.width / 2 - after.x - after.width / 2;
+      const dy = before.y + before.height / 2 - after.y - after.height / 2;
+      const base = minimum ? 'translate(-50%, -50%)' : 'translate(0, 0)';
+      const movement = this.dial.animate([
+        { transform: base + ' translate(' + dx + 'px,' + dy + 'px) scale(' + before.width / after.width + ')' },
+        { transform: base },
+      ], { duration: 220, easing: 'cubic-bezier(0.37, 0, 0.63, 1)', fill: 'both' });
+      this.movement = movement;
+      movement.onfinish = () => {
+        if (this.movement !== movement) return;
+        movement.cancel();
+        this.movement = undefined;
+      };
+    }
     if (initial || this.motion.matches) this.controls.hidden = minimum;
     else {
       const fade = this.controls.animate(
         [{ opacity: minimum ? 1 : 0 }, { opacity: minimum ? 0 : 1 }],
-        { duration: minimum ? 150 : 220, fill: 'both' },
+        { duration: 220, easing: 'ease-in-out', fill: 'both' },
       );
       this.fade = fade;
       fade.onfinish = () => {
@@ -78,19 +78,5 @@ export class DisplayMode {
         this.fade = undefined;
       };
     }
-    this.fit();
-  }
-  private fit(): void {
-    const measurement = ++this.measurement;
-    if (!this.minimum) return;
-    // 非表示・他ウィンドウに隠れた起動ではrAFが停止するため、描画フレームを待たない。
-    queueMicrotask(() => {
-      if (measurement !== this.measurement || !this.minimum) return;
-      // 通常表示と同じ位置を保ち、時計盤の下端から必要な高さを決める。
-      const height = Math.ceil(
-        this.dial.getBoundingClientRect().bottom + window.scrollY + 70,
-      );
-      void window.cuckoo.fitMinimumDisplay(height).catch(this.report);
-    });
   }
 }

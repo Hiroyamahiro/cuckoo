@@ -1,5 +1,12 @@
+import palette from '../icons/tabler/palette.svg?raw';
+import photo from '../icons/tabler/photo.svg?raw';
+import minimum from '../icons/tabler/arrows-minimize.svg?raw';
+import refresh from '../icons/tabler/refresh.svg?raw';
+import tray from '../icons/tabler/arrow-bar-to-down.svg?raw';
+import copyright from '../icons/tabler/copyright.svg?raw';
 import headerSvg from '../../assets/icons/header/cuckoo.svg?raw';
 import packageInfo from '../../package.json';
+import { UpdateMenu } from '../update-menu';
 import type { Theme } from '../shared/settings';
 export class AppMenu {
   private readonly trigger =
@@ -12,8 +19,33 @@ export class AppMenu {
     private readonly chooseBackground: (enabled: boolean) => void,
     private readonly chooseMinimum: (enabled: boolean) => void,
   ) {
+    const icons: Record<string,string> = {
+      '.menu-caption': palette, '#background-toggle': photo,
+      '#minimum-toggle': minimum, '#update-action': refresh, '#store-in-tray': tray,
+      '#show-credits': copyright,
+    };
+    for (const item of this.menu.querySelectorAll<HTMLElement>('button,.menu-caption')) {
+      const label = document.createElement('span');
+      label.className = 'menu-label';
+      label.textContent = item.textContent!.trim();
+      if (item.id === 'update-action') label.id = 'update-label';
+      item.replaceChildren(label);
+      for (const [selector, svg] of Object.entries(icons)) if (item.matches(selector)) {
+        const icon = document.createElement('span');
+        icon.className = 'menu-icon';
+        icon.setAttribute('aria-hidden','true');
+        icon.innerHTML = svg;
+        icon.querySelector('svg')!.setAttribute('focusable','false');
+        item.prepend(icon);
+      }
+    }
     document.querySelector('#header-icon')!.innerHTML = headerSvg;
     document.querySelector('#credits-icon')!.innerHTML = headerSvg;
+    const dot = document.createElement('span');
+    dot.id = 'update-dot';
+    dot.hidden = true;
+    document.querySelector('#header-icon')!.append(dot);
+    new UpdateMenu();
     document.querySelector('#credits-version')!.textContent =
       `Version ${packageInfo.version}`;
     document.querySelector('#credits-author')!.textContent =
@@ -91,6 +123,13 @@ export class AppMenu {
       );
       this.close();
     });
+    document.querySelector('#store-in-tray')!.addEventListener('click', () => {
+      this.close();
+      void window.cuckoo.windowAction('close').catch((error) => {
+        document.querySelector('#input-error')!.textContent =
+          `タスクトレイに格納できませんでした：${String(error)}`;
+      });
+    });
     document.querySelector('#show-credits')!.addEventListener('click', () => {
       this.close(false);
       this.credits.showModal();
@@ -122,7 +161,7 @@ export class AppMenu {
   }
   private items(): HTMLButtonElement[] {
     return [
-      ...this.menu.querySelectorAll<HTMLButtonElement>('button:not([hidden])'),
+      ...this.menu.querySelectorAll<HTMLButtonElement>('button:not([hidden]):not(:disabled)'),
     ];
   }
   private open(last = false): void {

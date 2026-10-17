@@ -1,5 +1,4 @@
 ﻿export type Theme = 'system' | 'light' | 'dark';
-export const defaultSoundId = 'otologic-cuckoo-clock';
 export interface SoundSettings {
   soundId: string;
   hourlyRepeat: 1 | 2;
@@ -49,19 +48,6 @@ export function legacySlots(schedule: LegacySchedule): boolean[] {
       inLegacyRange(slot * 30, schedule.start, schedule.end),
   );
 }
-export const defaultSettings: Readonly<Settings> = {
-  version: 6,
-  minimumDisplay: false,
-  backgroundIllustration: true,
-  presets: [],
-  soundId: defaultSoundId,
-  hourlyRepeat: 2,
-  halfHourlyRepeat: 1,
-  enabled: true,
-  slots: legacySlots({ minute: 0, start: '09:00', end: '21:00' }),
-  volume: 50,
-  theme: 'system',
-};
 export type SaveState = 'initial' | 'saved' | 'pending' | 'error';
 export const presetNameLimit = 40;
 export const presetLimit = 100;

@@ -1,0 +1,13 @@
+﻿@import './theme.css';
+@import './power-button.css';
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+body { font: 13px var(--font-family); color: var(--text); background: var(--background); }
+.panel { padding: 8px; height: 100%; border: 1px solid var(--border); }
+.power-area { height: 78px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+#power-state { font-size: 11px; color: var(--muted); }
+.menu-item { display: block; width: 100%; height: 34px; border: 0; border-radius: 5px; text-align: left; padding: 0 12px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.menu-item:hover { background: var(--button-hover-background); }
+.menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#enabled:disabled { cursor: wait; opacity: .65; }
+#notice { height: 16px; font-size: 11px; color: var(--error); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

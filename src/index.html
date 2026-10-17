@@ -11,9 +11,7 @@
   <body>
     <div class="forest-background" aria-hidden="true"></div>
     <div class="titlebar window-titlebar" aria-label="ウィンドウ操作">
-      <div id="window-caption"><span>Cuckoo</span></div>
-      <button id="window-minimize" type="button" aria-label="最小化" title="最小化"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 8h10"/></svg></button>
-      <button id="window-maximize" type="button" aria-label="最大化" title="最大化"><svg viewBox="0 0 12 12" aria-hidden="true"><path class="maximize-icon" d="M1.5 1.5h9v9h-9z"/><path class="restore-icon" d="M3.5 3.5h-2v7h7v-2m-5-5v-2h7v7h-7z"/></svg></button>
+      <div id="window-caption"></div>
       <button id="window-close" type="button" aria-label="閉じる（トレイへ格納）" title="閉じる（トレイへ格納）"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="m1.5 1.5 9 9m0-9-9 9"/></svg></button>
     </div>
     <header>
@@ -95,8 +93,16 @@
             ミニマム表示
           </button>
           <hr role="separator" />
+          <button id="update-action" type="button" role="menuitem" tabindex="-1">&#26356;&#26032;&#12434;&#30906;&#35469;</button>
+          <button id="cancel-update" type="button" role="menuitem" tabindex="-1" hidden>&#12480;&#12454;&#12531;&#12525;&#12540;&#12489;&#12434;&#20013;&#27490;</button>
+          <p id="update-message" role="status"></p>
+          <hr role="separator" />
+          <button id="store-in-tray" type="button" role="menuitem" tabindex="-1">
+            タスクトレイに格納
+          </button>
+          <hr role="separator" />
           <button id="show-credits" type="button" role="menuitem" tabindex="-1">
-            ライセンス・クレジット
+            クレジット
           </button>
           <button
             id="fallback-quit"
@@ -159,19 +165,28 @@
         </div>
       </div>
       <div id="normal-controls">
-        <p class="hint">クリックでON/OFF。同じリングをなぞってまとめて選択。</p>
+        <p class="hint">クリックでひとつずつ、ドラッグでまとめてON/OFF</p>
         <div
           id="presets"
           class="presets"
           role="group"
-          aria-label="時報の一括選択"
+          aria-label="時報の一括操作"
         >
-          <button type="button" data-preset="day" disabled>日中のみ</button>
-          <button type="button" data-preset="hourly" disabled>終日</button>
-          <button type="button" data-preset="half-hourly" disabled>
-            すべてON
-          </button>
-          <button type="button" data-preset="off" disabled>すべてOFF</button>
+          <button id="bulk-toggle" type="button" popovertarget="bulk-popover" aria-haspopup="dialog" aria-controls="bulk-popover" aria-expanded="false" disabled>一括設定</button>
+          <div id="bulk-popover" popover="auto" role="dialog" aria-label="一括設定">
+          <div class="bulk-row" role="group" aria-label="00分の一括操作">
+            <span>00分</span>
+            <button type="button" data-ring="0" data-preset="day" disabled>日中</button>
+            <button type="button" data-ring="0" data-preset="all" disabled>すべて</button>
+          </div>
+          <div class="bulk-row" role="group" aria-label="30分の一括操作">
+            <span>30分</span>
+            <button type="button" data-ring="1" data-preset="day" disabled>日中</button>
+            <button type="button" data-ring="1" data-preset="all" disabled>すべて</button>
+          </div>
+          <hr />
+          <button class="bulk-off" type="button" data-preset="off" disabled>すべてOFF</button>
+          </div>
         </div>
         <section class="my-presets" aria-labelledby="my-presets-title">
           <div class="preset-heading">
@@ -235,7 +250,11 @@
           <div class="volume-control">
             <label class="settings-section-title" for="volume"
               >音量<output id="volume-value" for="volume">50%</output></label
-            ><input id="volume" type="range" min="0" max="100" step="1" />
+            >
+            <div class="volume-slider">
+              <span id="volume-icon" aria-hidden="true"></span>
+              <input id="volume" type="range" min="0" max="100" step="1" />
+            </div>
           </div>
           <button id="test" type="button" disabled>試聴</button>
           <section id="sound-panel" class="sound-panel" aria-labelledby="sound-title">
@@ -247,7 +266,7 @@
             <div class="tone-repeat" role="group" aria-label="30分の回数"><div class="repeat-options"><label><input type="radio" name="half-hourly-repeat" value="1" checked/>1回</label><label><input type="radio" name="half-hourly-repeat" value="2" />2回</label></div></div>
             <p id="half-sound-warning" class="sound-warning" role="status"></p>
             <details id="sound-management"><summary>音色の追加</summary>
-              <p class="description">MP3形式・25MiB・60秒まで、100件まで登録できます。<br>
+              <p class="description">MP3形式・25MB・60秒まで、100件まで登録できます。<br>
                 元ファイルを移動・削除しても登録した音色は保持されます。</p>
               <button id="sound-register" type="button" disabled>＋ 音色を追加</button>
               <ul id="custom-sounds" aria-label="登録済み音色"></ul>
@@ -255,9 +274,6 @@
             </details>
             <p id="sound-notice" role="status" aria-live="polite"></p><p id="sound-error" role="alert"></p>
           </section>
-          <p class="note">
-            ウィンドウを閉じるとタスクトレイに常駐します。完全終了はトレイの「終了」から。
-          </p>
         </fieldset>
         <div id="sound-recovery" class="sound-actions" hidden><p id="sound-recovery-help"></p><button id="sound-refresh" type="button" hidden>音色を再確認</button><button id="sound-confirm" type="button" hidden>保存結果を確認</button></div>
       </div>
@@ -320,8 +336,9 @@
       </section>
       <section class="credits-section" aria-labelledby="credits-library-title">
         <h3 id="credits-library-title">アイコン・ライブラリ</h3>
-        <p>Tabler Icons（MIT）</p>
-        <p>各ライセンス・ソース入手先は、インストール先の licenses フォルダーに同梱しています。</p>
+        <p>SVG: Tabler Icons / Pawe&#322; Kuna (MIT)</p>
+        <p>Font: Urbanist (SIL OFL 1.1)</p>
+        <p><a href="THIRD-PARTY-NOTICES.html" data-credit="notices">&#31532;&#19977;&#32773;&#12521;&#12452;&#12475;&#12531;&#12473;&#20840;&#25991;&#12434;&#38283;&#12367;</a></p>
       </section>
       <button id="close-credits" type="button">閉じる</button>
     </dialog>

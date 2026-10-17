@@ -26,7 +26,8 @@ export class PowerButton {
       ? '時報をOFFにする（現在ON）'
       : '時報をONにする（現在OFF）';
     this.button.setAttribute('aria-label', label);
-    this.button.title = label;
+    this.button.removeAttribute('title');
+    this.button.dataset.tooltip = label;
   }
   private cancel(): void {
     clearTimeout(this.timer);

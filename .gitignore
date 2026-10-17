@@ -34,3 +34,7 @@ Desktop.ini
 /artifacts/
 /release/
 /releases/
+
+# Native installer binaries and packaging inputs
+/setup/build/
+/setup/dist/

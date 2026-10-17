@@ -1,5 +1,6 @@
 //! Geometry belongs to Rust, survives WebView destruction, and is not persisted.
 //! All native calls run on the UI thread, outside the controller's mutex.
+use std::time::{Duration, Instant};
 use tauri::{Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Rect {
@@ -22,12 +23,34 @@ pub struct Observed {
     pub maximized: bool,
     pub minimized: bool,
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Plan {
     pub rect: Rect,
     pub min_width: u32,
     pub min_height: u32,
     pub maximize: bool,
+}
+const TRANSITION: Duration = Duration::from_millis(220);
+#[derive(Clone)]
+struct Animation {
+    from: Rect,
+    plan: Plan,
+    started: Instant,
+    minimum: bool,
+    scale: f64,
+}
+impl Animation {
+    fn sample(&self, elapsed: Duration, origin: Rect) -> Rect {
+        let t = (elapsed.as_secs_f64() / TRANSITION.as_secs_f64()).clamp(0., 1.);
+        let ease = (1. - (std::f64::consts::PI * t).cos()) / 2.;
+        let size =
+            |a: u32, b: u32| (a as f64 + (b as f64 - a as f64) * ease).round().max(1.) as u32;
+        Rect {
+            width: size(self.from.width, self.plan.rect.width),
+            height: size(self.from.height, self.plan.rect.height),
+            ..origin
+        }
+    }
 }
 #[derive(Default, Clone)]
 pub struct Display {
@@ -35,13 +58,8 @@ pub struct Display {
     pub minimum: bool,
     pub normal: Option<Snapshot>,
     pub current: Option<Snapshot>,
-}
-pub fn valid_height(h: f64) -> Result<(), String> {
-    if h.is_finite() && (300.0..=1600.0).contains(&h) {
-        Ok(())
-    } else {
-        Err("表示領域の高さが不正です。".into())
-    }
+    animation: Option<Animation>,
+    minimum_size: (f64, f64),
 }
 fn px(n: f64, scale: f64) -> u32 {
     (n * scale).round().clamp(1.0, u32::MAX as f64) as u32
@@ -73,13 +91,10 @@ pub fn best_area(r: Rect, areas: &[Rect]) -> Rect {
 }
 impl Display {
     pub fn attach(&mut self, label: &str, o: Observed) -> Plan {
+        self.animation = None;
         self.label = Some(label.into());
         let initial = Snapshot {
-            rect: Rect {
-                width: px(550., o.scale),
-                height: px(1000., o.scale),
-                ..o.rect
-            },
+            rect: o.rect,
             maximized: false,
         };
         let s = self.current.unwrap_or(initial);
@@ -89,11 +104,15 @@ impl Display {
         self.current = Some(s);
         Plan {
             rect: s.rect,
-            min_width: px(400., o.scale).min(s.rect.width),
+            min_width: px(self.minimum_size.0, o.scale)
+                .saturating_add(o.frame.width)
+                .min(s.rect.width),
             min_height: if self.minimum {
                 s.rect.height
             } else {
-                px(400., o.scale).min(s.rect.height)
+                px(self.minimum_size.1, o.scale)
+                    .saturating_add(o.frame.height)
+                    .min(s.rect.height)
             },
             maximize: s.maximized && !self.minimum,
         }
@@ -104,17 +123,15 @@ impl Display {
         }
         self.minimum = minimum;
         if minimum {
-            let normal = if o.maximized { o.normal_rect } else { o.rect };
-            self.normal = Some(Snapshot {
-                rect: normal,
-                maximized: o.maximized,
-            });
-            Some(Plan {
-                rect: normal,
-                min_width: px(400., o.scale).min(normal.width),
-                min_height: px(300., o.scale).min(normal.height),
-                maximize: false,
-            })
+            // A reversal must not replace the saved normal geometry with an
+            // intermediate frame from the previous transition.
+            if self.animation.is_none() {
+                self.normal = Some(Snapshot {
+                    rect: if o.maximized { o.normal_rect } else { o.rect },
+                    maximized: o.maximized,
+                });
+            }
+            Some(self.minimum_plan(o))
         } else {
             let saved = self.normal.unwrap_or(Snapshot {
                 rect: o.rect,
@@ -126,30 +143,42 @@ impl Display {
                     y: o.rect.y,
                     ..saved.rect
                 },
-                min_width: px(600., o.scale).min(saved.rect.width),
-                min_height: px(400., o.scale).min(saved.rect.height),
+                min_width: px(self.minimum_size.0, o.scale)
+                    .saturating_add(o.frame.width)
+                    .min(saved.rect.width),
+                min_height: px(self.minimum_size.1, o.scale)
+                    .saturating_add(o.frame.height)
+                    .min(saved.rect.height),
                 maximize: saved.maximized,
             })
         }
     }
-    pub fn fit(&self, label: &str, h: f64, o: Observed) -> Result<Option<Plan>, String> {
-        valid_height(h)?;
+    pub fn fit(&self, label: &str, o: Observed) -> Result<Option<Plan>, String> {
         if self.label.as_deref() != Some(label) {
             return Err("古いウィンドウからの要求です。".into());
         }
         if !self.minimum {
             return Ok(None);
         }
-        let height = px(h.ceil(), o.scale).saturating_add(o.frame.height);
-        Ok(Some(Plan {
-            rect: Rect { height, ..o.rect },
-            min_width: px(600., o.scale).min(o.rect.width),
+        Ok(Some(self.minimum_plan(o)))
+    }
+    fn minimum_plan(&self, o: Observed) -> Plan {
+        let width = px(self.minimum_size.0, o.scale).saturating_add(o.frame.width);
+        let height = px(self.minimum_size.1, o.scale).saturating_add(o.frame.height);
+        Plan {
+            rect: Rect {
+                width,
+                height,
+                ..if o.maximized { o.normal_rect } else { o.rect }
+            },
+            min_width: width,
             min_height: height,
             maximize: false,
-        }))
+        }
     }
+
     pub fn observe(&mut self, label: &str, o: Observed) {
-        if self.label.as_deref() != Some(label) || o.minimized {
+        if self.label.as_deref() != Some(label) || o.minimized || self.animation.is_some() {
             return;
         }
         self.current = Some(Snapshot {
@@ -160,6 +189,11 @@ impl Display {
             },
             maximized: o.maximized,
         });
+    }
+    pub fn detach(&mut self, label: &str) {
+        if self.label.as_deref() == Some(label) {
+            self.animation = None;
+        }
     }
 }
 pub fn observed(w: &WebviewWindow) -> Result<Observed, String> {
@@ -213,6 +247,10 @@ pub fn observed(w: &WebviewWindow) -> Result<Observed, String> {
     })
 }
 pub fn apply(w: &WebviewWindow, plan: Plan) -> Result<(), String> {
+    let rect = bounded(w, plan.rect, true)?;
+    apply_rect(w, plan, rect)
+}
+fn bounded(w: &WebviewWindow, rect: Rect, reposition: bool) -> Result<Rect, String> {
     let monitors = w.available_monitors().map_err(|e| e.to_string())?;
     let areas = monitors
         .iter()
@@ -230,7 +268,20 @@ pub fn apply(w: &WebviewWindow, plan: Plan) -> Result<(), String> {
     if areas.is_empty() {
         return Err("作業領域を取得できません。".into());
     }
-    let rect = within(plan.rect, best_area(plan.rect, &areas));
+    let area = best_area(rect, &areas);
+    // Attaching a recreated window may recover an off-screen position. Mode
+    // switches preserve the user's top-left, including near a work-area edge.
+    Ok(if reposition {
+        within(rect, area)
+    } else {
+        Rect {
+            width: rect.width.min(area.width),
+            height: rect.height.min(area.height),
+            ..rect
+        }
+    })
+}
+fn apply_rect(w: &WebviewWindow, plan: Plan, rect: Rect) -> Result<(), String> {
     if w.is_maximized().map_err(|e| e.to_string())? {
         w.unmaximize().map_err(|e| e.to_string())?;
     }
@@ -261,10 +312,188 @@ pub fn apply(w: &WebviewWindow, plan: Plan) -> Result<(), String> {
     }
     Ok(())
 }
+pub fn motion_enabled() -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::*;
+    let mut client: i32 = 0;
+    let mut animation = ANIMATIONINFO {
+        cbSize: std::mem::size_of::<ANIMATIONINFO>() as u32,
+        iMinAnimate: 0,
+    };
+    unsafe {
+        SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &mut client as *mut _ as _, 0) != 0
+            && client != 0
+            && SystemParametersInfoW(
+                SPI_GETANIMATION,
+                animation.cbSize,
+                &mut animation as *mut _ as _,
+                0,
+            ) != 0
+            && animation.iMinAnimate != 0
+    }
+}
+fn kill_timer(w: &WebviewWindow) {
+    if let Ok(hwnd) = w.hwnd() {
+        unsafe {
+            windows_sys::Win32::UI::WindowsAndMessaging::KillTimer(
+                hwnd.0 as _,
+                super::native_frame::RESIZE_TIMER,
+            );
+        }
+    }
+}
+fn animate(app: &tauri::AppHandle, w: &WebviewWindow, mut plan: Plan) -> Result<(), String> {
+    let state = app.state::<std::sync::Arc<crate::State>>();
+    let o = observed(w)?;
+    plan.rect = bounded(w, plan.rect, false)?;
+    {
+        let d = state.display.lock().unwrap();
+        if d.animation
+            .as_ref()
+            .is_some_and(|a| a.minimum == d.minimum && a.plan == plan)
+        {
+            return Ok(());
+        }
+    }
+    kill_timer(w);
+    if !motion_enabled()
+        || !w.is_visible().unwrap_or(false)
+        || o.maximized
+        || o.minimized
+        || (o.rect.width == plan.rect.width && o.rect.height == plan.rect.height)
+    {
+        state.display.lock().unwrap().animation = None;
+        apply_rect(w, plan, plan.rect)?;
+        let o = observed(w)?;
+        state.display.lock().unwrap().observe(w.label(), o);
+        return Ok(());
+    }
+    w.set_min_size(Some(PhysicalSize::new(1, 1)))
+        .map_err(|e| e.to_string())?;
+    {
+        let mut d = state.display.lock().unwrap();
+        let started = d
+            .animation
+            .as_ref()
+            .filter(|a| a.minimum == d.minimum)
+            .map(|a| a.started)
+            .unwrap_or_else(Instant::now);
+        // Retarget a content-height refit without stretching the 220ms deadline.
+        let from = d
+            .animation
+            .as_ref()
+            .filter(|a| a.minimum == d.minimum)
+            .map(|a| a.from)
+            .unwrap_or(o.rect);
+        d.animation = Some(Animation {
+            from,
+            plan,
+            started,
+            minimum: d.minimum,
+            scale: o.scale,
+        });
+    }
+    let hwnd = w.hwnd().map_err(|e| e.to_string())?;
+    if unsafe {
+        windows_sys::Win32::UI::WindowsAndMessaging::SetTimer(
+            hwnd.0 as _,
+            super::native_frame::RESIZE_TIMER,
+            15,
+            None,
+        )
+    } == 0
+    {
+        return settle(app, w);
+    }
+    Ok(())
+}
+pub fn settle(app: &tauri::AppHandle, w: &WebviewWindow) -> Result<(), String> {
+    kill_timer(w);
+    let state = app.state::<std::sync::Arc<crate::State>>();
+    let animation = {
+        let mut d = state.display.lock().unwrap();
+        if d.label.as_deref() != Some(w.label()) {
+            return Ok(());
+        }
+        d.animation.take()
+    };
+    if let Some(mut a) = animation {
+        let o = observed(w)?;
+        a.plan.rect.x = o.rect.x;
+        a.plan.rect.y = o.rect.y;
+        apply_rect(w, a.plan, a.plan.rect)?;
+        let o = observed(w)?;
+        state.display.lock().unwrap().observe(w.label(), o);
+    }
+    Ok(())
+}
+pub fn tick(app: &tauri::AppHandle, w: &WebviewWindow) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::*;
+    let state = app.state::<std::sync::Arc<crate::State>>();
+    let animation = {
+        let d = state.display.lock().unwrap();
+        if d.label.as_deref() != Some(w.label()) {
+            return;
+        }
+        d.animation.clone()
+    };
+    let Some(a) = animation else {
+        kill_timer(w);
+        return;
+    };
+    let result = (|| -> Result<(), String> {
+        let o = observed(w)?;
+        if o.maximized || o.minimized || o.scale != a.scale {
+            kill_timer(w);
+            let mut d = state.display.lock().unwrap();
+            d.animation = None;
+            d.observe(w.label(), o);
+            return Ok(());
+        }
+        if a.started.elapsed() >= TRANSITION || !motion_enabled() {
+            return settle(app, w);
+        }
+        let r = a.sample(a.started.elapsed(), o.rect);
+        let hwnd = w.hwnd().map_err(|e| e.to_string())?;
+        if unsafe {
+            SetWindowPos(
+                hwnd.0 as _,
+                std::ptr::null_mut(),
+                0,
+                0,
+                r.width as i32,
+                r.height as i32,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+            )
+        } == 0
+        {
+            return Err("ウィンドウ寸法を変更できません。".into());
+        }
+        Ok(())
+    })();
+    if let Err(error) = result {
+        kill_timer(w);
+        state.display.lock().unwrap().animation = None;
+        *state.display_error.lock().unwrap() = error;
+    }
+}
 pub fn attach(app: &tauri::AppHandle, w: &WebviewWindow) -> Result<(), String> {
     let state = app.state::<std::sync::Arc<crate::State>>();
     let o = observed(w)?;
-    let plan = state.display.lock().unwrap().attach(w.label(), o);
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|c| c.label == "main")
+        .ok_or("Main window configuration missing")?;
+    let plan = {
+        let mut d = state.display.lock().unwrap();
+        d.minimum_size = (
+            config.min_width.ok_or("minWidth missing")?,
+            config.min_height.ok_or("minHeight missing")?,
+        );
+        d.attach(w.label(), o)
+    };
     apply(w, plan)?;
     sync(app, w)
 }
@@ -278,26 +507,51 @@ pub fn sync(app: &tauri::AppHandle, w: &WebviewWindow) -> Result<(), String> {
         (before, d.mode(w.label(), minimum, o))
     };
     if let Some(p) = plan {
-        if let Err(e) = apply(w, p) {
+        let result = animate(app, w, p);
+        if let Err(e) = result {
             *state.display.lock().unwrap() = before;
             return Err(e);
         }
     }
     Ok(())
 }
-pub fn fit(app: &tauri::AppHandle, w: &WebviewWindow, height: f64) -> Result<(), String> {
+pub fn fit(app: &tauri::AppHandle, w: &WebviewWindow) -> Result<(), String> {
     sync(app, w)?;
     let state = app.state::<std::sync::Arc<crate::State>>();
     let o = observed(w)?;
-    let plan = state.display.lock().unwrap().fit(w.label(), height, o)?;
+    let plan = state.display.lock().unwrap().fit(w.label(), o)?;
     if let Some(p) = plan {
-        apply(w, p)?;
+        animate(app, w, p)?;
     }
     Ok(())
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn display() -> Display {
+        Display {
+            minimum_size: (400., 400.),
+            ..Display::default()
+        }
+    }
+    #[test]
+    fn initial_size_is_preserved_and_minimum_uses_configured_dimensions() {
+        let mut d = display();
+        d.minimum_size = (480., 420.);
+        let mut o = observed();
+        o.rect.width = 500;
+        assert_eq!(d.attach("w", o).rect, o.rect);
+        d.mode("w", true, o);
+        let a = d.fit("w", o).unwrap().unwrap();
+        o.rect.width = 800;
+        o.rect.height = 1100;
+        let b = d.fit("w", o).unwrap().unwrap();
+        assert_eq!(a, b);
+        assert_eq!((a.rect.width, a.rect.height), (496, 459));
+        o.scale = 1.5;
+        let p = d.fit("w", o).unwrap().unwrap();
+        assert_eq!((p.rect.width, p.rect.height), (736, 669));
+    }
     fn observed() -> Observed {
         Observed {
             rect: Rect {
@@ -319,27 +573,94 @@ mod tests {
         }
     }
     #[test]
+    fn resize_eases_for_220ms_without_changing_the_current_origin() {
+        let o = observed();
+        let target = Plan {
+            rect: Rect {
+                height: 500,
+                ..o.rect
+            },
+            min_width: 400,
+            min_height: 500,
+            maximize: false,
+        };
+        let a = Animation {
+            from: o.rect,
+            plan: target,
+            started: Instant::now(),
+            minimum: true,
+            scale: 1.,
+        };
+        assert_eq!(a.sample(Duration::ZERO, o.rect), o.rect);
+        assert_eq!(a.sample(Duration::from_millis(110), o.rect).height, 700);
+        assert_eq!(a.sample(TRANSITION, o.rect).height, 500);
+        let moved = Rect {
+            x: -600,
+            y: 80,
+            ..o.rect
+        };
+        assert_eq!(
+            (
+                a.sample(Duration::from_millis(150), moved).x,
+                a.sample(Duration::from_millis(150), moved).y
+            ),
+            (-600, 80)
+        );
+        let mut last = 900;
+        for ms in 0..=220 {
+            let height = a.sample(Duration::from_millis(ms), o.rect).height;
+            assert!(height <= last);
+            last = height;
+        }
+    }
+    #[test]
+    fn repeated_reversals_and_transient_observations_keep_the_normal_snapshot() {
+        let mut d = display();
+        let mut o = observed();
+        d.attach("main-1", o);
+        d.mode("main-1", true, o);
+        let p = d.fit("main-1", o).unwrap().unwrap();
+        d.animation = Some(Animation {
+            from: o.rect,
+            plan: p,
+            started: Instant::now(),
+            minimum: true,
+            scale: 1.,
+        });
+        o.rect.height = 750;
+        d.observe("main-1", o);
+        assert_ne!(d.current.unwrap().rect.height, 750);
+        assert_eq!(d.mode("main-1", false, o).unwrap().rect.height, 900);
+        d.mode("main-1", true, o);
+        assert_eq!(d.normal.unwrap().rect.height, 900);
+        d.detach("old-window");
+        assert!(d.animation.is_some());
+        d.detach("main-1");
+        assert!(d.animation.is_none());
+        assert_eq!(d.mode("main-1", false, o).unwrap().rect.height, 900);
+    }
+    #[test]
     fn modes_preserve_normal_and_survive_recreation() {
-        let mut d = Display::default();
+        let mut d = display();
         let mut o = observed();
         d.attach("main-1", o);
         d.observe("main-1", o);
         let p = d.mode("main-1", true, o).unwrap();
-        assert_eq!(p.rect, o.rect);
-        let p = d.fit("main-1", 600., o).unwrap().unwrap();
-        assert_eq!(p.rect.height, 639);
+        assert_eq!((p.rect.width, p.rect.height), (416, 439));
+        let p = d.fit("main-1", o).unwrap().unwrap();
+        assert_eq!(p.rect.height, 439);
         o.rect = p.rect;
         d.observe("main-1", o);
         let restored = d.attach("main-2", o);
-        assert_eq!(restored.rect.height, 639);
-        assert!(d.fit("main-1", 600., o).is_err());
+        assert_eq!(restored.rect.height, 439);
+        assert!(d.fit("main-1", o).is_err());
         let normal = d.mode("main-2", false, o).unwrap();
         assert_eq!(normal.rect.height, 900);
         assert_eq!(normal.rect.x, 200);
     }
     #[test]
     fn returning_to_normal_keeps_the_moved_minimum_origin() {
-        let mut d = Display::default();
+        let mut d = display();
         let mut o = observed();
         d.attach("w", o);
         d.mode("w", true, o);
@@ -352,8 +673,8 @@ mod tests {
         assert_eq!((p.rect.width, p.rect.height), (550, 900));
     }
     #[test]
-    fn maximized_restores_and_dpi_converts_content_height() {
-        let mut d = Display::default();
+    fn maximized_restores_and_dpi_converts_configured_dimensions() {
+        let mut d = display();
         let mut o = observed();
         d.attach("w", o);
         d.observe("w", o);
@@ -362,15 +683,12 @@ mod tests {
         d.mode("w", true, o);
         o.scale = 1.5;
         o.frame.height = 58;
-        let p = d.fit("w", 600., o).unwrap().unwrap();
-        assert_eq!(p.rect.height, 958);
+        let p = d.fit("w", o).unwrap().unwrap();
+        assert_eq!(p.rect.height, 658);
         assert!(d.mode("w", false, o).unwrap().maximize);
     }
     #[test]
-    fn height_validation_and_work_area_clamp() {
-        for h in [f64::NAN, f64::INFINITY, -1., 299., 1601.] {
-            assert!(valid_height(h).is_err());
-        }
+    fn work_area_clamp() {
         let a = Rect {
             x: -1280,
             y: 0,
@@ -413,7 +731,7 @@ mod tests {
     }
     #[test]
     fn maximized_recreation_uses_native_normal_placement() {
-        let mut d = Display::default();
+        let mut d = display();
         let mut o = observed();
         d.attach("first", o);
         o.maximized = true;
@@ -427,6 +745,8 @@ mod tests {
         let recreated = d.attach("second", o);
         assert!(recreated.maximize);
         assert_eq!(recreated.rect, o.normal_rect);
-        assert_eq!(d.mode("second", true, o).unwrap().rect, o.normal_rect);
+        let p = d.mode("second", true, o).unwrap();
+        assert_eq!((p.rect.x, p.rect.y), (o.normal_rect.x, o.normal_rect.y));
+        assert_eq!((p.rect.width, p.rect.height), (416, 439));
     }
 }
