@@ -1,0 +1,89 @@
+{
+  "schemaId": "cuckoo.tauri.settings",
+  "schemaVersion": 7,
+  "generation": 1,
+  "requiredCapabilities": [
+    "audio.user-mp3.v1",
+    "audio.per-boundary.v1",
+    "audio.builtin-set.v1"
+  ],
+  "schedule": {
+    "enabled": true,
+    "slots": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "appearance": {
+    "theme": "system",
+    "backgroundIllustration": true,
+    "minimumDisplay": false
+  },
+  "audio": {
+    "volume": 50,
+    "onHour": {
+      "soundId": "user:00000000-0000-4000-8000-000000000001",
+      "repeat": 2
+    },
+    "onHalfHour": {
+      "soundId": "builtin:school-bell"
+    },
+    "userSounds": [
+      {
+        "id": "user:00000000-0000-4000-8000-000000000001",
+        "kind": "user-mp3",
+        "name": "Synthetic user MP3",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "byteLength": 12345,
+        "durationMs": 1800
+      }
+    ]
+  },
+  "presets": []
+}

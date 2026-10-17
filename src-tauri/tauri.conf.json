@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Cuckoo",
+  "version": "2.0.0",
+  "identifier": "jp.hiroyamahiroshi.cuckoo",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "create": false,
+        "title": "Cuckoo",
+        "decorations": false,
+        "shadow": true,
+        "width": 560,
+        "height": 1050,
+        "minWidth": 460,
+        "minHeight": 640
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "../assets/icons/app/cuckoo-app.ico"
+    ],
+    "targets": [
+      "nsis"
+    ],
+    "publisher": "ひろやまひろし / Hiroyama Hiroshi",
+    "copyright": "Copyright © 2026 ひろやまひろし / Hiroyama Hiroshi",
+    "resources": {
+      "../licenses/": "licenses/",
+      "../docs/USER-GUIDE-ja.md": "README-ja.md"
+    },
+    "windows": {
+      "allowDowngrades": false,
+      "webviewInstallMode": {
+        "type": "embedBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "template": "installer/installer.nsi",
+        "installerHooks": "installer/hooks.nsh",
+        "installMode": "currentUser",
+        "languages": [
+          "Japanese",
+          "English"
+        ],
+        "startMenuFolder": "Hiroyama Hiroshi\\Cuckoo"
+      }
+    }
+  },
+  "mainBinaryName": "Cuckoo"
+}

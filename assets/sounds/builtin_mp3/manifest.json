@@ -1,0 +1,46 @@
+[
+  {
+    "id": "builtin:cuckoo-clock",
+    "file": "cuckoo-clock.mp3",
+    "sha256": "78ad9b57cc4db7ffe3e19c40c85b28f13867bcfe10e64cb01231c646a08787df",
+    "byteLength": 10993,
+    "sampleRate": 44100,
+    "channels": 2,
+    "sampleFrames": 42624,
+    "durationMs": 966.530612,
+    "gaplessTrimming": false
+  },
+  {
+    "id": "builtin:church-bell",
+    "file": "church-bell.mp3",
+    "sha256": "5fe40f24ff56d630cdb9c04638d47adf68c678307e15f16451fe2513b7dd4798",
+    "byteLength": 77808,
+    "sampleRate": 44100,
+    "channels": 2,
+    "sampleFrames": 332928,
+    "durationMs": 7549.387755,
+    "gaplessTrimming": false
+  },
+  {
+    "id": "builtin:pendulum-clock",
+    "file": "pendulum-clock.mp3",
+    "sha256": "add349c1a6576a720b8c3bc92eecdec0aef1f2b26914dfe66668fecf4963207d",
+    "byteLength": 69444,
+    "sampleRate": 44100,
+    "channels": 2,
+    "sampleFrames": 270720,
+    "durationMs": 6138.77551,
+    "gaplessTrimming": false
+  },
+  {
+    "id": "builtin:school-bell",
+    "file": "school-bell.mp3",
+    "sha256": "a6b6bbf02355c3dc16acb5979e359e07c9eb0f3a5e9014ca04dc3f2e02cc5d49",
+    "byteLength": 88520,
+    "sampleRate": 44100,
+    "channels": 2,
+    "sampleFrames": 309888,
+    "durationMs": 7026.938776,
+    "gaplessTrimming": false
+  }
+]

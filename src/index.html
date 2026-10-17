@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+    />
+    <title>Cuckoo</title>
+  </head>
+  <body>
+    <div class="forest-background" aria-hidden="true"></div>
+    <div class="titlebar window-titlebar" aria-label="ウィンドウ操作">
+      <div id="window-caption"><span>Cuckoo</span></div>
+      <button id="window-minimize" type="button" aria-label="最小化" title="最小化"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 8h10"/></svg></button>
+      <button id="window-maximize" type="button" aria-label="最大化" title="最大化"><svg viewBox="0 0 12 12" aria-hidden="true"><path class="maximize-icon" d="M1.5 1.5h9v9h-9z"/><path class="restore-icon" d="M3.5 3.5h-2v7h7v-2m-5-5v-2h7v7h-7z"/></svg></button>
+      <button id="window-close" type="button" aria-label="閉じる（トレイへ格納）" title="閉じる（トレイへ格納）"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="m1.5 1.5 9 9m0-9-9 9"/></svg></button>
+    </div>
+    <header>
+      <div class="brand">
+        <h1>
+          <button
+            id="app-menu-button"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-controls="app-menu"
+          >
+            <span id="header-icon" aria-hidden="true"></span><span>Cuckoo</span>
+            <svg
+              class="menu-chevron"
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              aria-hidden="true"
+            >
+              <path
+                d="m3 4.5 3 3 3-3"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </h1>
+        <div id="app-menu" role="menu" aria-label="Cuckooメニュー" hidden>
+          <div class="menu-caption" role="presentation">テーマ</div>
+          <button
+            type="button"
+            role="menuitemradio"
+            data-theme-choice="system"
+            aria-checked="true"
+            tabindex="-1"
+          >
+            システム
+          </button>
+          <button
+            type="button"
+            role="menuitemradio"
+            data-theme-choice="light"
+            aria-checked="false"
+            tabindex="-1"
+          >
+            ライト
+          </button>
+          <button
+            type="button"
+            role="menuitemradio"
+            data-theme-choice="dark"
+            aria-checked="false"
+            tabindex="-1"
+          >
+            ダーク
+          </button>
+          <hr role="separator" />
+          <button
+            id="background-toggle"
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked="false"
+            tabindex="-1"
+          >
+            背景イラスト
+          </button>
+          <hr role="separator" />
+          <button
+            id="minimum-toggle"
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked="false"
+            tabindex="-1"
+          >
+            ミニマム表示
+          </button>
+          <hr role="separator" />
+          <button id="show-credits" type="button" role="menuitem" tabindex="-1">
+            ライセンス・クレジット
+          </button>
+          <button
+            id="fallback-quit"
+            type="button"
+            role="menuitem"
+            tabindex="-1"
+            hidden
+          >
+            終了（トレイ生成失敗時）
+          </button>
+        </div>
+      </div>
+      <div class="current">
+        <span>次の時報</span><time id="next">準備中</time>
+        <span id="next-date"></span>
+      </div>
+    </header>
+    <main>
+      <div
+        id="dial"
+        class="clock-dial"
+        role="group"
+        aria-label="24時間の時報。内側は00分、外側は30分"
+      >
+        <div class="dial-center">
+          <div class="power-control">
+            <button
+              id="enabled"
+              type="button"
+              aria-pressed="true"
+              aria-label="時報をOFFにする（現在ON）"
+              disabled
+            >
+              <span class="power-disc" aria-hidden="true"
+                ><svg viewBox="0 0 24 24">
+                  <path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0" /></svg
+              ></span>
+            </button>
+            <span
+              id="power-feedback"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></span>
+          </div>
+          <button
+            id="clock-mode"
+            type="button"
+            aria-labelledby="current current-date"
+            aria-describedby="display-mode-hint"
+            aria-pressed="false"
+            disabled
+          >
+            <time id="current">—</time>
+            <span id="current-date"></span>
+            <span id="display-mode-hint" class="control-tooltip" role="tooltip"
+              >ミニマム表示に切り替える</span
+            >
+          </button>
+        </div>
+      </div>
+      <div id="normal-controls">
+        <p class="hint">クリックでON/OFF。同じリングをなぞってまとめて選択。</p>
+        <div
+          id="presets"
+          class="presets"
+          role="group"
+          aria-label="時報の一括選択"
+        >
+          <button type="button" data-preset="day" disabled>日中のみ</button>
+          <button type="button" data-preset="hourly" disabled>終日</button>
+          <button type="button" data-preset="half-hourly" disabled>
+            すべてON
+          </button>
+          <button type="button" data-preset="off" disabled>すべてOFF</button>
+        </div>
+        <section class="my-presets" aria-labelledby="my-presets-title">
+          <div class="preset-heading">
+            <h2 id="my-presets-title" class="settings-section-title">プリセット</h2>
+            <button id="preset-save" type="button" disabled>＋ 保存</button>
+          </div>
+          <p id="preset-empty">現在の時計盤を名前付きで保存できます。</p>
+          <div id="preset-controls" hidden>
+            <select id="preset-select" aria-label="保存済みプリセット"></select>
+            <button id="preset-overwrite" type="button" disabled>
+              上書き保存
+            </button>
+            <div class="preset-management">
+              <button
+                id="preset-manage"
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                aria-controls="preset-menu"
+              >
+                管理
+              </button>
+              <div
+                id="preset-menu"
+                role="menu"
+                aria-label="プリセットの管理"
+                hidden
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-preset-action="rename"
+                >
+                  名前変更
+                </button>
+                <button
+                  id="preset-reapply"
+                  type="button"
+                  role="menuitem"
+                  data-preset-action="apply"
+                  disabled
+                >
+                  保存内容を再適用
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-preset-action="delete"
+                >
+                  削除
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+        <p id="preset-difference" class="preset-difference" hidden>
+          保存内容から変更あり
+        </p>
+        <fieldset id="settings" disabled>
+          <legend class="sr-only">共通の設定</legend>
+          <div class="volume-control">
+            <label class="settings-section-title" for="volume"
+              >音量<output id="volume-value" for="volume">50%</output></label
+            ><input id="volume" type="range" min="0" max="100" step="1" />
+          </div>
+          <button id="test" type="button" disabled>試聴</button>
+          <section id="sound-panel" class="sound-panel" aria-labelledby="sound-title">
+            <h2 id="sound-title" class="settings-section-title">時報の音色</h2>
+            <div class="sound-route"><label for="hour-sound">00分</label><select id="hour-sound" disabled></select><button id="hour-preview" type="button" disabled>試聴</button></div>
+            <div class="tone-repeat" role="group" aria-label="00分の回数"><div class="repeat-options"><label><input type="radio" name="hourly-repeat" value="1" />1回</label><label><input type="radio" name="hourly-repeat" value="2" checked/>2回</label></div></div>
+            <p id="hour-sound-warning" class="sound-warning" role="status"></p>
+            <div class="sound-route"><label for="half-sound">30分</label><select id="half-sound" disabled></select><button id="half-preview" type="button" disabled>試聴</button></div>
+            <div class="tone-repeat" role="group" aria-label="30分の回数"><div class="repeat-options"><label><input type="radio" name="half-hourly-repeat" value="1" checked/>1回</label><label><input type="radio" name="half-hourly-repeat" value="2" />2回</label></div></div>
+            <p id="half-sound-warning" class="sound-warning" role="status"></p>
+            <details id="sound-management"><summary>音色の追加</summary>
+              <p class="description">MP3形式・25MiB・60秒まで、100件まで登録できます。<br>
+                元ファイルを移動・削除しても登録した音色は保持されます。</p>
+              <button id="sound-register" type="button" disabled>＋ 音色を追加</button>
+              <ul id="custom-sounds" aria-label="登録済み音色"></ul>
+              <p class="description" id="sound-empty">登録済みのカスタム音色はありません。</p>
+            </details>
+            <p id="sound-notice" role="status" aria-live="polite"></p><p id="sound-error" role="alert"></p>
+          </section>
+          <p class="note">
+            ウィンドウを閉じるとタスクトレイに常駐します。完全終了はトレイの「終了」から。
+          </p>
+        </fieldset>
+        <div id="sound-recovery" class="sound-actions" hidden><p id="sound-recovery-help"></p><button id="sound-refresh" type="button" hidden>音色を再確認</button><button id="sound-confirm" type="button" hidden>保存結果を確認</button></div>
+      </div>
+      <p id="input-error" role="alert"></p>
+      <p id="settings-error" role="alert"></p>
+      <p id="audio-error" role="alert"></p>
+    </main>
+    <dialog id="sound-rename-dialog" class="credits" aria-labelledby="sound-rename-title">
+      <form id="sound-rename-form">
+        <h2 id="sound-rename-title">登録名を変更</h2>
+        <label for="sound-rename-name">登録名</label>
+        <input id="sound-rename-name" type="text" maxlength="80" autocomplete="off" required />
+        <p id="sound-rename-error" role="alert"></p>
+        <div class="preset-dialog-buttons"><button id="sound-rename-cancel" type="button">キャンセル</button><button id="sound-rename-save" type="submit">変更を保存</button></div>
+      </form>
+    </dialog>
+    <dialog
+      id="preset-dialog"
+      class="credits"
+      aria-labelledby="preset-dialog-title"
+    >
+      <form id="preset-form">
+        <h2 id="preset-dialog-title"></h2>
+        <p id="preset-dialog-description"></p>
+        <label id="preset-name-label" for="preset-name"
+          >名前<input id="preset-name" type="text" autocomplete="off"
+        /></label>
+        <p id="preset-error" role="alert"></p>
+        <div class="preset-dialog-buttons">
+          <button id="preset-cancel" type="button">キャンセル</button
+          ><button id="preset-confirm" type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="credits-dialog" class="credits" aria-labelledby="credits-title">
+      <header class="credits-brand">
+        <span id="credits-icon" aria-hidden="true"></span>
+        <h2 id="credits-title">Cuckoo</h2>
+        <p id="credits-version"></p>
+        <p>毎日の時報を、シンプルに。</p>
+      </header>
+      <section class="credits-section" aria-labelledby="credits-creator-title">
+        <h3 id="credits-creator-title">制作</h3>
+        <p id="credits-author"></p>
+      </section>
+      <section class="credits-section" aria-labelledby="credits-sound-title">
+        <h3 id="credits-sound-title">サウンド</h3>
+        <p>
+          効果音：<a href="https://otologic.jp/" data-credit="otologic"
+            >OtoLogic</a
+          >
+        </p>
+        <p>
+          <a
+            href="https://creativecommons.org/licenses/by/4.0/"
+            data-credit="license"
+            >CC BY 4.0</a
+          >／加工あり
+        </p>
+      </section>
+      <section class="credits-section" aria-labelledby="credits-library-title">
+        <h3 id="credits-library-title">アイコン・ライブラリ</h3>
+        <p>Tabler Icons（MIT）</p>
+        <p>各ライセンス・ソース入手先は、インストール先の licenses フォルダーに同梱しています。</p>
+      </section>
+      <button id="close-credits" type="button">閉じる</button>
+    </dialog>
+  <script type="module" src="/bootstrap.ts"></script></body>
+</html>

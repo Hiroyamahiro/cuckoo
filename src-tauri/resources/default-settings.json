@@ -1,0 +1,76 @@
+{
+  "schemaId": "cuckoo.tauri.settings",
+  "schemaVersion": 7,
+  "generation": 1,
+  "requiredCapabilities": [],
+  "schedule": {
+    "enabled": true,
+    "slots": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "appearance": {
+    "theme": "system",
+    "backgroundIllustration": true,
+    "minimumDisplay": false
+  },
+  "audio": {
+    "volume": 50,
+    "onHour": {
+      "soundId": "builtin:cuckoo-clock",
+      "repeat": 2
+    },
+    "onHalfHour": {
+      "soundId": "builtin:cuckoo-clock"
+    },
+    "userSounds": []
+  },
+  "presets": []
+}

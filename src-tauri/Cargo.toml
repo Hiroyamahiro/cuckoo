@@ -1,0 +1,36 @@
+[package]
+name = "cuckoo"
+version = "2.0.0"
+authors = ["ひろやまひろし / Hiroyama Hiroshi"]
+edition = "2021"
+[features]
+# Separate verification build: an embedded UUID selects ONLY a workspace dummy
+# profile. Normal releases have no argument/environment settings-root override.
+settings-test-harness = []
+presets-test-harness = ["settings-test-harness"]
+native-test-harness = ["settings-test-harness"]
+audio-test-harness = ["native-test-harness"]
+mp3-test-harness = ["audio-test-harness"]
+mp3-timing-test-harness = ["mp3-test-harness"]
+sound-library-test-harness = ["mp3-timing-test-harness"]
+custom-playback-test-harness = ["sound-library-test-harness"]
+routing-test-harness = ["custom-playback-test-harness"]
+sound-ui-test-harness = ["routing-test-harness"]
+preview-test-harness = ["sound-ui-test-harness"]
+ui-details-test-harness = ["preview-test-harness"]
+ui-unification-test-harness = ["ui-details-test-harness"]
+ui-registration-test-harness = ["ui-unification-test-harness"]
+ui-tones-test-harness = ["ui-registration-test-harness"]
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-ico"] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = "0.4"
+rodio = "0.20"
+symphonia = { version = "=0.5.5", default-features = false, features = ["mp3"] }
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_Controls_Dialogs", "Win32_System_Com"] }

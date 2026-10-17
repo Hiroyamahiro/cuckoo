@@ -1,0 +1,20 @@
+Supplemental license notices for crates whose published package omits the root license file
+
+alloc-stdlib 0.3.0: BSD-3-Clause, ALLOC-STDLIB-LICENSE.txt
+Official source repository: https://github.com/dropbox/rust-alloc-no-stdlib
+
+dasp_sample 0.11.0: MIT OR Apache-2.0, DASP-SAMPLE-LICENSE.txt
+Official source repository: https://github.com/RustAudio/sample
+
+webview2-com 0.39.1, webview2-com-macros 0.8.1, webview2-com-sys 0.39.1:
+MIT, WEBVIEW2-RS-LICENSE.txt
+Official source repository: https://github.com/wravery/webview2-rs
+
+selectors 0.38.0 and Symphonia 0.5.5 components:
+MPL-2.0, full text in MPL-2.0.txt. Exact-version source archives are listed in SOURCE-CODE.txt.
+No local modifications to these crate sources were made.
+
+Tauri API JavaScript runtime: the MIT and Apache-2.0 notices supplied in @tauri-apps/api are included.
+NSIS installer engine and Modern UI: NSIS-COPYING.txt and NSIS-MODERN-UI-LICENSE.txt.
+The Microsoft WebView2 bootstrapper is obtained by Tauri from Microsoft's official download endpoint.
+WebView2 is installed as Microsoft's separate runtime and is not an embedded custom fork.

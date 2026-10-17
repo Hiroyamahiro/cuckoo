@@ -1,0 +1,5 @@
+const{test}=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),ts=require('typescript');
+const m={exports:{}};new Function('module','exports',ts.transpileModule(fs.readFileSync('src/audio-feedback.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(m,m.exports);
+const state=(id,outcome,phase='Ready')=>({audio:{state:phase,message:'再生エラー',active:null,lastOutcome:{id,outcome:{state:outcome}}}});
+test('ordinary playback, stop and switching do not produce messages',()=>{const f=new m.exports.AudioFeedback();for(const outcome of ['Completed','Interrupted','Completed'])assert.equal(f.update(state(1,outcome)),null)});
+test('new failures notify once; old receipts and recreated views do not repeat',()=>{const f=new m.exports.AudioFeedback();f.update(state(1,'Completed'));assert.equal(f.update(state(2,'Failed')),'再生エラー');assert.equal(f.update(state(2,'Failed')),null);f.update(state(3,'Completed'));assert.equal(f.update(state(2,'Failed')),null);const recreated=new m.exports.AudioFeedback();assert.equal(recreated.update(state(2,'Failed')),null);assert.equal(f.update(state(4,'Failed','Unavailable')),'再生エラー')});
