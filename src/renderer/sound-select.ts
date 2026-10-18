@@ -17,7 +17,14 @@ export class CustomSelect {
  private button=document.createElement('button');
  private popup=document.createElement('div');
  private active=-1;private signature='';private open=false;
- constructor(private select:HTMLSelectElement,private options:{icons?:boolean;placeholder?:string}={}){
+ private thumbnailObserver=new IntersectionObserver(entries=>{
+  for(const entry of entries){
+   const slot=entry.target as HTMLElement;slot.dataset.visible=String(entry.isIntersecting);
+   if(entry.isIntersecting){if(!slot.querySelector('img'))this.loadThumbnail(slot);}
+   else if(slot.querySelector('img'))slot.replaceChildren(icon(slot.dataset.value!));
+  }
+ });
+ constructor(private select:HTMLSelectElement,private options:{icons?:boolean;placeholder?:string;thumbnail?:(id:string)=>Promise<string|null>}={}){
   select.hidden=true;select.tabIndex=-1;select.setAttribute('aria-hidden','true');
   this.button.id=select.id+'-control';this.button.type='button';this.button.className='sound-select-trigger';
   this.button.setAttribute('role','combobox');this.button.setAttribute('aria-haspopup','listbox');this.button.setAttribute('aria-expanded','false');
@@ -42,25 +49,42 @@ export class CustomSelect {
   this.button.disabled=this.select.disabled||this.select.matches(':disabled');
   if(this.button.disabled)this.close();
   const selected=this.select.selectedOptions[0];
-  const key=JSON.stringify([...this.select.options].map(o=>[o.value,o.text,o.disabled]))+this.select.value;
+  const key=JSON.stringify([...this.select.options].map(o=>[o.value,o.text,o.disabled,o.dataset.thumbnailKey,o.parentElement instanceof HTMLOptGroupElement?o.parentElement.label:'']))+this.select.value;
   if(key===this.signature)return;this.signature=key;
+  this.thumbnailObserver.disconnect();
   const value=document.createElement('span');value.id=this.button.id+'-value';value.className='sound-select-name';value.textContent=selected?.text??this.options.placeholder??'音色';
   if(!this.button.hasAttribute('aria-labelledby'))this.button.setAttribute('aria-label',`${this.select.getAttribute('aria-label')??'選択'}：${value.textContent}`);
   if(!this.popup.hasAttribute('aria-labelledby'))this.popup.setAttribute('aria-label',this.select.getAttribute('aria-label')??'選択');
   const chevron=document.createElement('span');chevron.className='sound-select-chevron';chevron.setAttribute('aria-hidden','true');
   const arrow=document.createElementNS('http://www.w3.org/2000/svg','svg');arrow.setAttribute('viewBox','0 0 12 12');
   const path=document.createElementNS(arrow.namespaceURI,'path');path.setAttribute('d','m2.5 4.5 3.5 3 3.5-3');arrow.append(path);chevron.append(arrow);
-  this.button.replaceChildren(...(this.options.icons===false?[]:[icon(this.select.value)]),value,chevron);this.button.title=selected?.text??'';
+  this.button.replaceChildren(...this.leading(this.select.value),value,chevron);this.button.title=selected?.text??'';
   this.button.dataset.unavailable=String(!!selected?.disabled);
-  this.popup.replaceChildren(...[...this.select.options].map((option,index)=>{
+  this.popup.replaceChildren(...[...this.select.options].flatMap((option,index)=>{
    const row=document.createElement('div');row.id=this.popup.id+'-'+index;row.className='sound-select-option';row.setAttribute('role','option');
    row.setAttribute('aria-selected',String(option.selected));row.setAttribute('aria-disabled',String(option.disabled));row.title=option.text;
    const name=document.createElement('span');name.className='sound-select-name';name.textContent=option.text;
    const check=document.createElement('span');check.className='sound-select-check';check.textContent=option.selected?'✓':'';check.setAttribute('aria-hidden','true');
-   row.append(...(this.options.icons===false?[]:[icon(option.value)]),name,check);
-   row.addEventListener('pointerdown',event=>event.preventDefault());row.addEventListener('click',()=>this.commit(index));return row;
+   row.append(...this.leading(option.value),name,check);
+   row.addEventListener('pointerdown',event=>event.preventDefault());row.addEventListener('click',()=>this.commit(index));
+   const group=option.parentElement;
+   if(group instanceof HTMLOptGroupElement&&option===group.firstElementChild){const heading=document.createElement('div');heading.className='sound-select-group';heading.setAttribute('role','presentation');heading.textContent=group.label;return [heading,row];}return [row];
   }));
   if(this.open)this.close();
+ }
+ private leading(id:string):Element[]{
+  if(!this.options.thumbnail)return this.options.icons===false?[]:[icon(id)];
+  const slot=document.createElement('span');slot.className='sound-select-thumbnail';slot.dataset.value=id;slot.setAttribute('aria-hidden','true');slot.append(icon(id));
+  this.thumbnailObserver.observe(slot);return [slot];
+ }
+ private loadThumbnail(slot:HTMLElement):void{
+  if(slot.dataset.loading==='true')return;slot.dataset.loading='true';
+  void Promise.resolve().then(()=>this.options.thumbnail!(slot.dataset.value!)).then(src=>{
+   if(!src||!slot.isConnected||slot.dataset.visible!=='true'||!/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(src))return;
+   const image=document.createElement('img');image.alt='';image.decoding='async';image.draggable=false;
+   image.addEventListener('load',()=>{if(slot.isConnected&&slot.dataset.visible==='true')slot.replaceChildren(image);},{once:true});
+   image.src=src;
+  }).catch(()=>{}).finally(()=>{slot.dataset.loading='false';}); // Keep the fallback on failure.
  }
  private show():void{
   if(this.button.matches(':disabled'))return;
@@ -76,8 +100,9 @@ export class CustomSelect {
  private close():void{this.open=false;if(this.popup.matches(':popover-open'))this.popup.hidePopover();this.button.setAttribute('aria-expanded','false');this.button.removeAttribute('aria-activedescendant');}
  private enabled():number[]{return [...this.select.options].flatMap((o,i)=>o.disabled?[]:[i]);}
  private highlight():void{
-  [...this.popup.children].forEach((row,i)=>row.classList.toggle('active',i===this.active));
-  const row=this.popup.children[this.active] as HTMLElement|undefined;
+  const rows=this.popup.querySelectorAll<HTMLElement>('[role="option"]');
+  rows.forEach((row,i)=>row.classList.toggle('active',i===this.active));
+  const row=rows[this.active];
   if(row){this.button.setAttribute('aria-activedescendant',row.id);row.scrollIntoView({block:'nearest'});}
  }
  private commit(index:number):void{

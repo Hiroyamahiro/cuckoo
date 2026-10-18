@@ -313,6 +313,11 @@ impl Store {
         Ok(())
     }
     pub fn load(&mut self) -> Result<Loaded, DiskError> {
+        let result=self.load_inner();
+        if matches!(&result,Ok(Loaded::Valid(_))){crate::voicevox::request_cleanup(self.root.clone());}
+        result
+    }
+    fn load_inner(&mut self) -> Result<Loaded, DiskError> {
         let b = read(&self.path())?;
         self.expected = b.as_ref().map(|b| sha(b));
         if let Some(raw) = &b {
@@ -402,6 +407,7 @@ impl Store {
         Ok(catalog)
     }
     pub fn commit(&mut self, mut doc: Document) -> Result<Document, DiskError> {
+        let _references=crate::voicevox::reference_guard().map_err(|e|err(&e))?;
         if read(&self.path())?.as_ref().map(|b| sha(b)) != self.expected {
             return Err(err("ExternalChangeConflict"));
         }
@@ -414,6 +420,17 @@ impl Store {
         }
         let catalog = self.check_catalog(&doc)?;
         let old = read(&self.path())?.and_then(|b| settings_model::decode(&b).ok());
+        for (speech,previous) in [(&doc.audio.on_hour.speech,old.as_ref().and_then(|d|d.audio.on_hour.speech.as_ref())),(&doc.audio.on_half_hour.speech,old.as_ref().and_then(|d|d.audio.on_half_hour.speech.as_ref()))] {
+            if let Some(speech)=speech {if Some(speech)!=previous {speech.validate_cache(&self.root).map_err(|e|err(&e))?;}}
+        }
+        for chime in &doc.schedule.custom {
+            if let Some(speech)=&chime.speech {
+                let previous=old.as_ref().and_then(|d|d.schedule.custom.iter().find(|c|c.id==chime.id));
+                if previous.is_none_or(|p|p.sound_id!=chime.sound_id || p.speech!=chime.speech || p.minute!=chime.minute) {
+                    crate::voicevox::validate_cached(&self.root,&chime.sound_id,speech,chime.minute).map_err(|e|err(&e))?;
+                }
+            }
+        }
         // Unchanged unavailable selections remain visible as unavailable; newly selected IDs must be valid.
         let mut guards = vec![];
         let mut selections = vec![
@@ -449,6 +466,7 @@ impl Store {
             e
         })?;
         drop(guards);
+        crate::voicevox::request_cleanup(self.root.clone());
         Ok(saved)
     }
     pub(crate) fn commit_catalog_operation(
@@ -457,6 +475,7 @@ impl Store {
         store: &mut crate::sound_library::Store,
         catalog: crate::sound_library::Catalog,
     ) -> Result<Document, DiskError> {
+        let _references=crate::voicevox::reference_guard().map_err(|e|err(&e))?;
         let previous_catalog = if doc.catalog_ref.is_none() && catalog.generation == 1 {
             let (old, reference) =
                 crate::sound_library::inspect_pending_first(&self.root).map_err(library_error)?;
@@ -504,6 +523,7 @@ impl Store {
             e.uncertain = true;
             e
         })?;
+        crate::voicevox::request_cleanup(self.root.clone());
         Ok(saved)
     }
     fn commit_raw(&mut self, mut doc: Document) -> Result<Document, DiskError> {
@@ -640,6 +660,12 @@ impl Store {
         }
         d.upgrade();
         crate::sound_library::rebind_settings_backup(&self.root, &mut d).map_err(library_error)?;
+        for speech in [&d.audio.on_hour.speech,&d.audio.on_half_hour.speech].into_iter().flatten(){speech.validate_cache(&self.root).map_err(|e|err(&e))?;}
+        for chime in &d.schedule.custom {
+            if let Some(speech)=&chime.speech {
+                crate::voicevox::validate_cached(&self.root,&chime.sound_id,speech,chime.minute).map_err(|e|err(&e))?;
+            }
+        }
         let catalog = self.check_catalog(&d)?;
         for id in d.selected_sounds() {
             crate::sound_library::validate_reference(&self.root, &catalog, id)

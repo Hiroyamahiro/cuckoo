@@ -215,15 +215,13 @@ fn preview_plan(s: &Value, target: &str, sound_id: Option<String>, repeat: Optio
     }
     let (id, playback_repeat) = match target {
         "hour" => (
-            s["audioRouting"]["onHour"]["soundId"]
-                .as_str()
+            scheduler::route_sound(&s["audioRouting"]["onHour"],Local::now().hour()*60)
                 .ok_or("InvalidRouting")?
                 .to_string(),
             s["hourlyRepeat"].as_u64().unwrap_or(1),
         ),
         "halfHour" => (
-            s["audioRouting"]["onHalfHour"]["soundId"]
-                .as_str()
+            scheduler::route_sound(&s["audioRouting"]["onHalfHour"],Local::now().hour()*60+30)
                 .ok_or("InvalidRouting")?
                 .to_string(),
             s["halfHourlyRepeat"].as_u64().unwrap_or(1),
@@ -235,6 +233,7 @@ fn preview_plan(s: &Value, target: &str, sound_id: Option<String>, repeat: Optio
     let individual = if target == "custom" { json!(volume.unwrap_or(100)) }
         else { s["audioRouting"][match target { "hour" => "onHour", "halfHour" => "onHalfHour", _ => "" }]["volume"].clone() };
     let gain = scheduler::effective_volume(&s["volume"], &individual);
+    let playback_repeat=voicevox::playback_repeat(&id,playback_repeat);
     Ok((id, playback_repeat, gain))
 }
 #[cfg(test)]
@@ -245,6 +244,7 @@ mod preview_plan_tests {
         let s = json!({"volume":50,"hourlyRepeat":2,"halfHourlyRepeat":1,"audioRouting":{"onHour":{"soundId":"builtin:cuckoo-clock","volume":80},"onHalfHour":{"soundId":"builtin:church-bell","volume":60}}});
         let (id, repeat, volume) = preview_plan(&s,"custom",Some("builtin:school-bell".into()),Some(2),Some(80)).unwrap();
         assert_eq!(id,"builtin:school-bell"); assert_eq!(repeat,2); assert_eq!(volume,0.4);
+        assert_eq!(preview_plan(&s,"custom",Some(format!("voicevox:{}","a".repeat(64))),Some(2),Some(80)).unwrap().1,1);
         assert_eq!(preview_plan(&s,"hour",None,None,None).unwrap().2,0.4);
         assert_eq!(preview_plan(&s,"halfHour",None,None,None).unwrap().2,0.3);
         assert_eq!(preview_plan(&s,"custom",Some(id.clone()),Some(1),Some(0)).unwrap().2,0.0);

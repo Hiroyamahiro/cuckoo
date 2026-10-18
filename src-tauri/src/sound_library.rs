@@ -1,7 +1,7 @@
 //! D1-only sidecar catalog. No IPC path input, no playback routing, no v7 mutation.
 #![allow(dead_code)] // Rust management API is intentionally not exposed by normal UI yet.
 #[path = "sound_library_paths.rs"]
-mod paths;
+pub(crate) mod paths;
 #[cfg(test)]
 #[path = "sound_library_playback_tests.rs"]
 mod playback_tests;
@@ -321,6 +321,9 @@ pub(crate) fn rebind_settings_backup(
     Ok(())
 }
 pub(crate) fn hold_reference(root: &Path, catalog: &Catalog, id: &str) -> Result<Option<File>> {
+    if crate::voicevox::id_valid(id) {
+        return crate::voicevox::hold(root,id).map(Some).map_err(|e|err(&e));
+    }
     if crate::builtin_audio::find(id).is_some() {
         return Ok(None);
     }

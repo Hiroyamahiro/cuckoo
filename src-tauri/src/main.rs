@@ -3,6 +3,8 @@
 mod tray_panel;
 mod updates;
 mod update_http;
+mod voicevox;
+mod voicevox_http;
 mod audio;
 mod builtin_audio;
 mod external_links;
@@ -221,7 +223,7 @@ async fn update_settings(
     state
         .settings
         .apply(&session_id, base_revision, &request_id, &patch)?;
-    if patch.get("customChimes").is_some() {
+    if settings_model::editor_patch(&patch) {
         let settings = state.settings.clone();
         let receipt = tauri::async_runtime::spawn_blocking(move || settings.wait_preset(&request_id, std::time::Duration::from_secs(5)))
             .await.map_err(|e| e.to_string())?;
@@ -287,7 +289,7 @@ fn submit_routed(
     deadline: Option<std::time::Instant>,
     id: &str,
 ) -> Result<u64, String> {
-    if sound_library::id_valid(id) {
+    if sound_library::id_valid(id) || voicevox::id_valid(id) {
         state
             .audio
             .submit_custom(automatic, repeat, volume, key, deadline, id)
@@ -300,8 +302,7 @@ fn submit_routed(
 fn play(state: &State, repeat: u64) -> Result<u64, String> {
     let s = state.settings.snapshot();
     let volume = scheduler::effective_volume(&s["volume"], &s["audioRouting"]["onHour"]["volume"]);
-    let id = s["audioRouting"]["onHour"]["soundId"]
-        .as_str()
+    let id = scheduler::route_sound(&s["audioRouting"]["onHour"],Local::now().hour()*60)
         .unwrap_or(builtin_audio::DEFAULT_ID);
     if state.sound_ops.snapshot()["busy"] == true {
         return Err("AudioManagementBusy".into());
@@ -347,8 +348,7 @@ fn test_sound(
     }
     let repeat = s["hourlyRepeat"].as_u64().unwrap_or(2);
     let id = sound_id.unwrap_or_else(|| {
-        s["audioRouting"]["onHour"]["soundId"]
-            .as_str()
+        scheduler::route_sound(&s["audioRouting"]["onHour"],Local::now().hour()*60)
             .unwrap_or(builtin_audio::DEFAULT_ID)
             .to_string()
     });
@@ -821,6 +821,11 @@ fn main() {
                 sound_commands::audio_library_operation,
                 sound_commands::audio_library_receipt,
                 sound_commands::preview_audio_source,
+                voicevox::voicevox_check,
+                voicevox::voicevox_policy,
+                voicevox::voicevox_thumbnail,
+                voicevox::voicevox_generate,
+                voicevox::voicevox_protect_editor,
                 tray_panel::tray_panel_action,
                 get_status,
                 update_settings,

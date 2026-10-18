@@ -51,6 +51,8 @@ pub struct CustomChime {
     pub sound_id: String,
     pub repeat: u8,
     pub volume: u8,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub speech: Option<crate::voicevox::Speech>,
 }
 fn full_volume() -> u8 { 100 }
 fn is_full_volume(value: &u8) -> bool { *value == 100 }
@@ -77,6 +79,8 @@ pub struct OnHour {
     pub repeat: u8,
     #[serde(default = "full_volume", skip_serializing_if = "is_full_volume")]
     pub volume: u8,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub speech: Option<crate::voicevox::RouteSpeech>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -86,6 +90,8 @@ pub struct OnHalfHour {
     pub repeat: u8,
     #[serde(default = "full_volume", skip_serializing_if = "is_full_volume")]
     pub volume: u8,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub speech: Option<crate::voicevox::RouteSpeech>,
 }
 fn one_repeat() -> u8 { 1 }
 fn is_one_repeat(value: &u8) -> bool { *value == 1 }
@@ -268,6 +274,8 @@ impl Document {
             return Err("TooManyPresets".into());
         }
         let mut minutes = HashSet::new();
+        if let Some(speech)=&self.audio.on_hour.speech {speech.validate(0)?;}
+        if let Some(speech)=&self.audio.on_half_hour.speech {speech.validate(30)?;}
         let mut custom_ids = HashSet::new();
         for c in &self.schedule.custom {
             if c.minute >= 1440 || !minutes.insert(c.minute) {
@@ -275,9 +283,13 @@ impl Document {
             }
             if uuid::Uuid::parse_str(&c.id).is_err() || !custom_ids.insert(&c.id)
                 || c.volume > 100 || ![1, 2].contains(&c.repeat)
-                || c.sound_id == REMOVED_WAV || !sound_id_valid(&c.sound_id) {
+                || c.sound_id == REMOVED_WAV || !(sound_id_valid(&c.sound_id) || crate::voicevox::id_valid(&c.sound_id)) {
                 return Err("InvalidCustomChime".into());
             }
+            if let Some(speech)=&c.speech {
+                crate::voicevox::text(speech,c.minute)?;
+                if !crate::voicevox::id_valid(&c.sound_id){return Err("MissingGeneratedSpeech".into())}
+            } else if crate::voicevox::id_valid(&c.sound_id){return Err("MissingSpeechSettings".into())}
         }
         let mut ids = HashSet::new();
         let mut names = HashSet::new();
@@ -299,6 +311,7 @@ impl Document {
         Ok(())
     }
     pub fn upgrade(&mut self) {
+        self.normalize_speech_repeats();
         if self.schema_version == 7 {
             self.schema_version = 8;
             self.required_capabilities = CAPABILITIES.iter().map(|s| s.to_string()).collect();
@@ -314,8 +327,8 @@ impl Document {
         }
         let mut d = self.clone();
         match target {
-            "hour" => d.audio.on_hour.sound_id = id.into(),
-            "halfHour" => d.audio.on_half_hour.sound_id = id.into(),
+            "hour" => {d.audio.on_hour.sound_id = id.into();d.audio.on_hour.speech=None;},
+            "halfHour" => {d.audio.on_half_hour.sound_id = id.into();d.audio.on_half_hour.speech=None;},
             _ => return Err("InvalidSoundTarget".into()),
         };
         d.validate()?;
@@ -362,6 +375,16 @@ impl Document {
                     v.schedule.custom = serde_json::from_value(x.clone()).map_err(|_| "InvalidCustomChime")?;
                     v.schedule.custom.sort_by_key(|c| c.minute);
                 }
+                "hourVoice"|"halfHourVoice" => {
+                    let speech=serde_json::from_value(x.clone()).map_err(|_|"InvalidRouteSpeech")?;
+                    if k=="hourVoice" {v.audio.on_hour.speech=speech;}else{v.audio.on_half_hour.speech=speech;}
+                }
+                "hourSoundId"|"halfHourSoundId" => {
+                    let id=x.as_str().ok_or("InvalidSoundId")?;
+                    if id==REMOVED_WAV||!sound_id_valid(id){return Err("InvalidSoundId".into())}
+                    if k=="hourSoundId" {v.audio.on_hour.sound_id=id.into();v.audio.on_hour.speech=None;}
+                    else {v.audio.on_half_hour.sound_id=id.into();v.audio.on_half_hour.speech=None;}
+                }
                 "theme" => v.appearance.theme = x.as_str().ok_or("InvalidTheme")?.into(),
                 "backgroundIllustration" => {
                     v.appearance.background_illustration = x.as_bool().ok_or("InvalidBackground")?
@@ -373,14 +396,22 @@ impl Document {
             }
         }
         v.validate()?;
+        v.normalize_speech_repeats();
         Ok(v)
+    }
+    fn normalize_speech_repeats(&mut self){
+        if self.audio.on_hour.speech.is_some(){self.audio.on_hour.repeat=1;}
+        if self.audio.on_half_hour.speech.is_some(){self.audio.on_half_hour.repeat=1;}
+        for chime in &mut self.schedule.custom {if chime.speech.is_some(){chime.repeat=1;}}
     }
     pub fn selected_sounds(&self) -> Vec<&String> {
         let mut ids = vec![&self.audio.on_hour.sound_id, &self.audio.on_half_hour.sound_id];
         ids.extend(self.schedule.custom.iter().map(|c| &c.sound_id));
+        for speech in [&self.audio.on_hour.speech,&self.audio.on_half_hour.speech].into_iter().flatten(){ids.extend(speech.clips.values());}
         ids
     }
 }
+pub fn editor_patch(patch:&Value)->bool{["customChimes","hourVoice","halfHourVoice","hourSoundId","halfHourSoundId"].iter().any(|key|patch.get(*key).is_some())}
 
 // serde_json::Value normally accepts duplicate object keys. This visitor rejects
 // duplicates at every level and caps nesting before constructing the typed model.
@@ -489,8 +520,9 @@ pub fn decode(bytes: &[u8]) -> Result<Document, String> {
     {
         return Err("InvalidV8Shape".into());
     }
-    let doc: Document = serde_json::from_value(v).map_err(|_| "InvalidShapeOrUnknownField")?;
+    let mut doc: Document = serde_json::from_value(v).map_err(|_| "InvalidShapeOrUnknownField")?;
     doc.validate()?;
+    doc.normalize_speech_repeats();
     Ok(doc)
 }
 

@@ -260,7 +260,7 @@ impl MemorySettings {
         json!({"settings":i.doc.projection(),"audioRoutingAvailability":i.availability,"settingsSync":metadata(&i),"saveState":i.save,"settingsNotice":notice})
     }
     pub fn apply(&self, session: &str, base: u64, id: &str, patch: &Value) -> Result<(), String> {
-        if patch.get("customChimes").is_some() {
+        if crate::settings_model::editor_patch(patch) {
             return self.submit_change(session, base, id, &json!({"type":"custom-chimes","patch":patch}));
         }
         let mut i = self.inner.lock().unwrap();

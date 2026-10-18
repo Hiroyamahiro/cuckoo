@@ -1,8 +1,11 @@
 .sound-route select[hidden],.my-presets select[hidden] {display:none;}
+.sound-select-group {padding:8px;font-size:var(--font-caption);color:var(--muted);font-weight:600;}
 button.sound-select-trigger {display:flex;align-items:center;gap:8px;width:100%;min-width:0;text-align:left;height:38px;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:var(--font-small);}
 .my-presets .sound-select-trigger {flex:1;}
 button.sound-select-trigger:hover:not(:disabled) {background:var(--button-hover-background);}
 .sound-select-trigger svg,.sound-select-option svg {width:18px;height:18px;flex:0 0 18px;}
+.sound-select-thumbnail {display:grid;place-items:center;width:18px;height:18px;flex:0 0 18px;overflow:hidden;border-radius:3px;pointer-events:none;}
+.sound-select-thumbnail img {display:block;width:100%;height:100%;object-fit:contain;}
 .sound-select-name {display:block;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .sound-select-chevron,.sound-select-check {flex:0 0 14px;text-align:center;}
 .sound-select-chevron {display:flex;align-items:center;justify-content:center;height:14px;}

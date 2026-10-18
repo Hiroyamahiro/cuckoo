@@ -45,6 +45,11 @@ export interface Playback {
   repeat: 1 | 2;
 }
 export interface CuckooApi {
+  checkVoicevox():Promise<import('./voicevox').VoicevoxConnection>;
+  voicevoxPolicy(uuid:string):Promise<string>;
+  voicevoxThumbnail(uuid:string,styleId:number):Promise<string>;
+  generateSpeech(speech:import('./voicevox').Speech,minute:number,force:boolean):Promise<import('./voicevox').GeneratedSpeech>;
+  protectSpeechEditor(session:string,ids:string[]):Promise<void>;
   getUpdateStatus(): Promise<UpdateStatus>;
   updateAction(action: 'check' | 'install' | 'cancel'): Promise<void>;
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void;

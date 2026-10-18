@@ -2,6 +2,30 @@ use crate::{settings_model::{Document, decode}, scheduler::{self, Scheduler}};
 use serde_json::{json, Value};
 use chrono::{Local, TimeZone};
 use std::time::{Duration, Instant};
+#[test]
+fn regular_voice_routes_cover_every_hour_without_changing_slots_or_custom_chimes() {
+ let route=|offset:u16|json!({"settings":{"character":"zundamon","mode":"time","text":""},"clips":(0..24u16).map(|h|((h*60+offset).to_string(),json!(format!("voicevox:{:064x}",h*60+offset)))).collect::<serde_json::Map<String,Value>>()});
+ let baseline=Document::default();assert!(baseline.audio.on_hour.speech.is_none());assert!(baseline.audio.on_half_hour.speech.is_none());
+ let doc=baseline.patched(&json!({"enabled":true,"slots":vec![true;48],"hourVoice":route(0),"halfHourVoice":route(30),"hourVolume":80,"halfHourVolume":60,"volume":50,"customChimes":[chime(540)]})).unwrap();
+ let projection=doc.projection();
+ for hour in 0..24u32 {for offset in [0,30] {let minute=hour*60+offset;let events=scheduler::due(minute,&projection);assert_eq!(events[0].sound_id,format!("voicevox:{minute:064x}"));assert_eq!(events[0].volume,if offset==0{0.4}else{0.3});}}
+ assert_eq!(scheduler::due(540,&projection).len(),2);
+ assert!(doc.selected_sounds().iter().any(|id|id.as_str()==format!("voicevox:{:064x}",1410)));
+ let normal=doc.patched(&json!({"hourSoundId":"builtin:church-bell"})).unwrap();assert!(normal.audio.on_hour.speech.is_none());assert!(normal.audio.on_half_hour.speech.is_some());assert_eq!(normal.schedule,doc.schedule);
+ assert_eq!(decode(&serde_json::to_vec(&doc).unwrap()).unwrap(),doc);
+ assert_eq!(doc.audio.on_hour.repeat,1);assert_eq!(doc.audio.on_half_hour.repeat,1);
+ let mut old=serde_json::to_value(&doc).unwrap();
+ old["audio"]["onHour"]["repeat"]=json!(2);old["audio"]["onHalfHour"]["repeat"]=json!(2);
+ old["schedule"]["custom"][0]["speech"]=old["audio"]["onHour"]["speech"]["settings"].clone();
+ old["schedule"]["custom"][0]["soundId"]=old["audio"]["onHour"]["speech"]["clips"]["540"].clone();
+ let migrated=decode(&serde_json::to_vec(&old).unwrap()).unwrap();
+ assert_eq!(migrated.audio.on_hour.repeat,1);assert_eq!(migrated.audio.on_half_hour.repeat,1);assert_eq!(migrated.schedule.custom[0].repeat,1);
+ assert!(scheduler::due(540,&migrated.projection()).iter().all(|event|event.repeat==1));
+ assert_eq!(normal.patched(&json!({"hourlyRepeat":2})).unwrap().audio.on_hour.repeat,2);
+ let mut missing=route(0);missing["clips"].as_object_mut().unwrap().remove("60");assert!(baseline.patched(&json!({"hourVoice":missing})).is_err());
+ assert!(baseline.patched(&json!({"halfHourVoice":route(0)})).is_err());
+ let mut broken=projection.clone();broken["audioRouting"]["onHour"]["speech"]["clips"].as_object_mut().unwrap().remove("60");assert!(scheduler::due(60,&broken).is_empty());
+}
 fn chime(minute:u32)->Value { json!({"id":"11111111-1111-4111-8111-111111111111","minute":minute,"enabled":true,"soundId":"builtin:cuckoo-clock","repeat":2,"volume":80}) }
 fn time(day:u32,h:u32,m:u32,s:u32)->chrono::DateTime<Local>{ Local.with_ymd_and_hms(2026,10,day,h,m,s).single().unwrap() }
 #[test]

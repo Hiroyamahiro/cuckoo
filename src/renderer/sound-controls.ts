@@ -3,19 +3,15 @@ import {soundError} from '../sound-client';
 import {previewBlocked,previewLabel,previewMessage} from '../preview-client';
 import {soundRecovery} from '../ui-feedback';
 import {toast} from './toast';
-import {SoundSelect} from './sound-select';
 const el=<T extends HTMLElement>(id:string)=>document.getElementById(id) as T;
 const pendingNotice='音源操作の処理中、または保存結果が未確定です。「保存結果を確認」で確認できます。';
 export class SoundControls {
  private status:ClockStatus|undefined;
  private sources:SoundSource[]=[];
  private key='';private fetchVersion=0;private busy=false;private listError='';private loaded=false;private previewHead='';private listReference='';
- private hour=el<HTMLSelectElement>('hour-sound');private half=el<HTMLSelectElement>('half-sound');
- private hourSelect=new SoundSelect(this.hour);private halfSelect=new SoundSelect(this.half);
  private error=el('sound-error');private notice=el('sound-notice');
  constructor(private run:<T>(task:()=>Promise<T>)=>Promise<T>){
   window.addEventListener('preview-cooldown',()=>this.paint());
-  for(const[select,target]of [[this.hour,'hour'],[this.half,'halfHour']] as const)select.addEventListener('change',()=>{const soundId=select.value;this.paint();void this.perform({type:'select',target,soundId});});
   el('sound-register').addEventListener('click',()=>void this.perform({type:'register'}));
   const dialog=el<HTMLDialogElement>('sound-rename-dialog');
   el('sound-rename-cancel').addEventListener('click',()=>{if(!this.busy)dialog.close();});
@@ -23,8 +19,6 @@ export class SoundControls {
   el('sound-rename-form').addEventListener('submit',event=>{event.preventDefault();if(this.busy)return;const name=el<HTMLInputElement>('sound-rename-name').value.trim();if(!name){el('sound-rename-error').textContent='登録名を入力してください。';return;}void this.perform({type:'rename',id:dialog.dataset.soundId!,name}).then(saved=>{if(saved)dialog.close();else el('sound-rename-error').textContent=this.error.textContent;});});
   el('sound-refresh').addEventListener('click',()=>void this.refresh());
   el('sound-confirm').addEventListener('click',()=>void this.perform());
-  el('hour-preview').addEventListener('click',()=>void this.preview('hour'));
-  el('half-preview').addEventListener('click',()=>void this.preview('halfHour'));
  }
  update(status:ClockStatus):void{
   const p=status.audio?.preview,head=p?`${p.id}:${p.state}`:'';
@@ -61,18 +55,9 @@ export class SoundControls {
   const routing=s.settings.audioRouting;
   const listCurrent=this.loaded&&!this.listError&&this.listReference===JSON.stringify(s.settingsSync.catalogRef);
   const writable=this.loaded&&s.settingsSync.canEdit&&!s.soundManagement?.busy&&!this.busy&&!this.listError;
-  for(const [select,id,warning,availability]of [[this.hour,routing?.onHour.soundId,'hour-sound-warning',s.audioRoutingAvailability?.onHour],[this.half,routing?.onHalfHour.soundId,'half-sound-warning',s.audioRoutingAvailability?.onHalfHour]] as const){
-   const entries=this.sources.slice();if(id&&!entries.some(x=>x.id===id))entries.push({id,name:this.loaded?`利用不能な音源（${id}）`:'保存済みの音源（確認中）',kind:'custom',available:false,pinned:false});
-   const signature=JSON.stringify(entries.map(x=>[x.id,x.name,x.available]));
-   if(select.dataset.options!==signature){select.replaceChildren(...entries.map(source=>{const option=document.createElement('option');option.value=source.id;option.textContent=source.name+(source.available?'':'（利用不能）');option.disabled=!source.available;return option}));select.dataset.options=signature;}
-   if(id)select.value=id;select.disabled=!writable;
-   (select===this.hour?this.hourSelect:this.halfSelect).sync();
-   const source=entries.find(x=>x.id===id);el(warning).textContent=id&&((this.loaded&&source&&!source.available)||(!listCurrent&&availability?.state==='Unavailable'))?'この音源は利用できません。保存された選択を維持しています。正常な音源へ変更するか、登録状態を確認してください。':'';
-  }
   el<HTMLButtonElement>('sound-register').disabled=!writable;
   for(const id of ['sound-rename-name','sound-rename-save'])el<HTMLInputElement>(id).disabled=!writable;
   el<HTMLButtonElement>('sound-rename-cancel').disabled=this.busy;
-  for(const [button,id,label]of [['hour-preview',routing?.onHour.soundId,'試聴'],['half-preview',routing?.onHalfHour.soundId,'試聴']]as const){const b=el<HTMLButtonElement>(button);b.disabled=this.busy||previewBlocked(s);b.textContent=previewLabel(s,id,label);}
   const list=el('custom-sounds');const rows=this.sources.filter(x=>x.kind==='custom');el('sound-empty').hidden=rows.length>0;
   // Replace rows only when their meaningful state changes; retain focused buttons.
   const signature=JSON.stringify(rows.map(x=>[x.id,x.name,x.available,x.pinned]))+JSON.stringify(routing)+JSON.stringify(s.settings.customChimes)+String(writable)+String(this.busy)+String(previewBlocked(s))+JSON.stringify(s.audio?.preview)+JSON.stringify(s.audio?.active);

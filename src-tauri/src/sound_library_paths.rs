@@ -42,7 +42,7 @@ pub(super) fn lexical(p: &Path) -> Result<()> {
     }
     Ok(())
 }
-pub(super) fn safe(p: &Path) -> Result<()> {
+pub(crate) fn safe(p: &Path) -> Result<()> {
     lexical(p)?;
     for a in p.ancestors() {
         match fs::symlink_metadata(a) {
@@ -88,7 +88,7 @@ fn final_path(f: &File) -> Result<PathBuf> {
     lexical(&p)?;
     Ok(p)
 }
-pub(super) fn open_read(p: &Path) -> Result<File> {
+pub(crate) fn open_read(p: &Path) -> Result<File> {
     safe(p)?;
     let f = OpenOptions::new()
         .read(true)
@@ -104,7 +104,7 @@ pub(super) fn open_read(p: &Path) -> Result<File> {
     }
     Ok(f)
 }
-pub(super) fn read(p: &Path, max: u64) -> Result<Option<Vec<u8>>> {
+pub(crate) fn read(p: &Path, max: u64) -> Result<Option<Vec<u8>>> {
     let mut f = match open_read(p) {
         Ok(f) => f,
         Err(e) if e.code.starts_with("Io:NotFound:") => return Ok(None),
@@ -133,7 +133,7 @@ pub(super) fn directory(p: &Path) -> Result<File> {
     }
     Ok(f)
 }
-pub(super) fn directory_chain(p: &Path) -> Result<Vec<File>> {
+pub(crate) fn directory_chain(p: &Path) -> Result<Vec<File>> {
     lexical(p)?;
     let mut paths: Vec<_> = p.ancestors().collect();
     paths.reverse();
@@ -147,7 +147,7 @@ pub(super) fn directory_chain(p: &Path) -> Result<Vec<File>> {
     }
     Ok(handles)
 }
-pub(super) fn write_new(p: &Path, b: &[u8]) -> Result<()> {
+pub(crate) fn write_new(p: &Path, b: &[u8]) -> Result<()> {
     safe(p)?;
     let mut f = OpenOptions::new()
         .write(true)

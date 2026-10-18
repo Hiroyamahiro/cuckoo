@@ -1,4 +1,4 @@
-.sound-panel {grid-column:1 / -1;min-width:0;margin-top:0;padding-top:18px;border-top:1px solid color-mix(in srgb,currentColor 20%,transparent);text-align:left;}
+.sound-panel {min-width:0;text-align:left;}
 .sound-panel h2 {margin:0 0 12px;}
 .sound-route {display:grid;grid-template-columns:7rem minmax(0,1fr) auto;gap:.5rem;align-items:center;}
 .sound-route select {width:100%;min-width:0;}
@@ -6,7 +6,6 @@
 .sound-panel option {color:CanvasText;background:Canvas;}
 .sound-warning,#sound-error {color:var(--error,#b54708);font-size:12px;overflow-wrap:anywhere;}
 .sound-warning:empty,#sound-error:empty,#sound-notice:empty {display:none;}
-#sound-management {margin-top:1rem;padding-top:18px;border-top:1px solid color-mix(in srgb,currentColor 20%,transparent);}
 #sound-management summary {cursor:pointer;font-size:15px;font-weight:500;}
 #sound-management p,#sound-notice {line-height:1.6;}
 #sound-management p:not(.description),#sound-notice {font-size:.85rem;}
@@ -18,8 +17,8 @@
 #custom-sounds strong {font-size:13px;font-weight:500;flex:1 1 10rem;overflow-wrap:anywhere;}
 #custom-sounds span {flex:1 1 100%;font-size:12px;}
 .sound-actions {display:flex;align-items:center;gap:.5rem;justify-content:flex-end;margin-top:.75rem;flex-wrap:wrap;}
-#test,.sound-panel button,.sound-actions button,.sound-preview {font:inherit;font-size:var(--font-small);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--button-radius);padding:.45rem .65rem;cursor:pointer;}
-#test:hover:not(:disabled),.sound-panel button:hover:not(:disabled),.sound-actions button:hover:not(:disabled),.sound-preview:hover:not(:disabled) {background:var(--button-hover-background);}
+#test,#settings button,.sound-actions button,.sound-preview {font:inherit;font-size:var(--font-small);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--button-radius);padding:.45rem .65rem;cursor:pointer;}
+#test:hover:not(:disabled),#settings button:hover:not(:disabled),.sound-actions button:hover:not(:disabled),.sound-preview:hover:not(:disabled) {background:var(--button-hover-background);}
 @media(max-width:540px){.sound-route{grid-template-columns:1fr auto;}.sound-route label{grid-column:1/-1;}}
 
 

@@ -188,7 +188,7 @@
           <button class="bulk-off" type="button" data-preset="off" disabled>すべてOFF</button>
           </div>
         </div>
-        <section class="my-presets" aria-labelledby="my-presets-title">
+        <section class="my-presets settings-card" aria-labelledby="my-presets-title">
           <div class="preset-heading">
             <h2 id="my-presets-title" class="settings-section-title">プリセット</h2>
             <button id="preset-save" type="button" disabled>＋ 保存</button>
@@ -247,23 +247,20 @@
         </p>
         <fieldset id="settings" disabled>
           <legend class="sr-only">共通の設定</legend>
-          <div id="master-volume" class="volume-control"></div>
-          <button id="test" type="button" disabled>試聴</button>
-          <section id="sound-panel" class="sound-panel" aria-labelledby="sound-title">
+          <section class="settings-card master-volume-card" aria-label="全体の音量">
+            <div id="master-volume" class="volume-control"></div>
+            <button id="test" type="button" disabled>試聴</button>
+          </section>
+          <section id="sound-panel" class="sound-panel settings-card" aria-labelledby="sound-title">
             <h2 id="sound-title" class="settings-section-title">時報の音色</h2>
-            <div class="sound-route"><label for="hour-sound">00分</label><select id="hour-sound" disabled></select><button id="hour-preview" type="button" disabled>試聴</button></div>
-            <div class="tone-repeat" role="group" aria-label="00分の回数"><div class="repeat-options"><label><input type="radio" name="hourly-repeat" value="1" />1回</label><label><input type="radio" name="hourly-repeat" value="2" checked/>2回</label></div></div>
-            <div id="hour-volume" class="route-volume"></div>
-            <p id="hour-sound-warning" class="sound-warning" role="status"></p>
-            <div class="sound-route"><label for="half-sound">30分</label><select id="half-sound" disabled></select><button id="half-preview" type="button" disabled>試聴</button></div>
-            <div class="tone-repeat" role="group" aria-label="30分の回数"><div class="repeat-options"><label><input type="radio" name="half-hourly-repeat" value="1" checked/>1回</label><label><input type="radio" name="half-hourly-repeat" value="2" />2回</label></div></div>
-            <div id="half-volume" class="route-volume"></div>
-            <p id="half-sound-warning" class="sound-warning" role="status"></p>
-            <section id="custom-chimes" aria-labelledby="custom-chimes-title">
+            <div class="chime-row"><button id="hour-edit" class="chime-edit" type="button">00&#20998;</button><span id="hour-detail" class="chime-detail"></span><button id="hour-preview" class="sound-preview" type="button">&#35430;&#32884;</button></div>
+            <div class="chime-row"><button id="half-edit" class="chime-edit" type="button">30&#20998;</button><span id="half-detail" class="chime-detail"></span><button id="half-preview" class="sound-preview" type="button">&#35430;&#32884;</button></div>
+          </section>
+            <section id="custom-chimes" class="settings-card" aria-labelledby="custom-chimes-title">
               <div class="custom-chime-heading"><h2 id="custom-chimes-title" class="settings-section-title">時報の追加</h2><button id="custom-chime-add" type="button">＋ 追加</button></div>
               <ul id="custom-chime-list"></ul>
             </section>
-            <details id="sound-management"><summary>音色の追加</summary>
+            <details id="sound-management" class="settings-card"><summary>音色の追加</summary>
               <p class="description">MP3形式・25MB・60秒まで、100件まで登録できます。<br>
                 元ファイルを移動・削除しても登録した音色は保持されます。</p>
               <button id="sound-register" type="button" disabled>＋ 音色を追加</button>
@@ -271,7 +268,6 @@
               <p class="description" id="sound-empty">登録済みのカスタム音色はありません。</p>
             </details>
             <p id="sound-notice" role="status" aria-live="polite"></p><p id="sound-error" role="alert"></p>
-          </section>
         </fieldset>
         <div id="sound-recovery" class="sound-actions" hidden><p id="sound-recovery-help"></p><button id="sound-refresh" type="button" hidden>音色を再確認</button><button id="sound-confirm" type="button" hidden>保存結果を確認</button></div>
       </div>
@@ -282,8 +278,25 @@
     <dialog id="custom-chime-dialog" class="credits" aria-labelledby="custom-chime-title">
       <form id="custom-chime-form">
         <h2 id="custom-chime-title">時報の追加</h2>
-        <label class="settings-section-title" for="custom-chime-time-hour">時刻</label><div id="custom-chime-time"></div>
-        <label class="settings-section-title" for="custom-chime-sound">音色</label><select id="custom-chime-sound" required></select>
+        <div id="chime-time-field" class="chime-field"><label class="settings-section-title" for="custom-chime-time-hour">時刻</label><div id="custom-chime-time"></div></div>
+        <div class="chime-field"><label class="settings-section-title" for="custom-chime-sound">音色</label><select id="custom-chime-sound" required></select></div>
+        <section id="voicevox-controls" hidden aria-label="音声読み上げ">
+          <div class="voicevox-toolbar"><span id="voicevox-list-status" role="status"></span><button id="voicevox-refresh" type="button">一覧を更新</button></div>
+          <section id="voicevox-guide" class="voicevox-guide" hidden aria-labelledby="voicevox-guide-title">
+            <h3 id="voicevox-guide-title" class="settings-section-title">VOICEVOXに接続できません</h3>
+            <p>音声キャラクターを利用するには、無料の音声合成ソフト「VOICEVOX」が必要です。</p>
+            <p>VOICEVOXをインストールし、起動してから再接続してください。</p>
+            <div class="voicevox-actions"><button id="voicevox-download" type="button">VOICEVOXをダウンロード</button><button id="voicevox-reconnect" type="button">再接続</button><button id="voicevox-cancel" type="button">キャンセル</button></div>
+          </section>
+          <div class="chime-field"><label class="settings-section-title" for="voicevox-search">キャラクターを検索</label><input id="voicevox-search" type="search" autocomplete="off" placeholder="名前で検索"></div>
+          <div class="chime-field"><label class="settings-section-title" for="voicevox-character">音声キャラクター</label><select id="voicevox-character"></select></div>
+          <div class="chime-field"><label class="settings-section-title" for="voicevox-style">音声スタイル</label><select id="voicevox-style"></select></div>
+          <p id="voicevox-selection" class="description"></p>
+          <details id="voicevox-policy"><summary>音声ライブラリの利用規約・クレジット</summary><p id="voicevox-policy-status" role="status"></p><p id="voicevox-policy-text"></p></details>
+          <div class="chime-field"><label class="settings-section-title" for="voicevox-mode">読み上げモード</label><select id="voicevox-mode"><option value="time">時刻のみ</option><option value="time-text">時刻＋自由セリフ</option><option value="text">自由セリフのみ</option></select></div>
+          <div id="voicevox-text-field" class="chime-field" hidden><label class="settings-section-title" for="voicevox-text">自由セリフ</label><textarea id="voicevox-text" rows="3" maxlength="1000"></textarea></div>
+          <p id="voicevox-status" class="description" role="status" aria-live="polite"></p>
+        </section>
         <div class="custom-repeat" role="group" aria-labelledby="custom-repeat-title">
           <div id="custom-repeat-title" class="settings-section-title">再生回数</div>
           <div class="repeat-options"><label><input type="radio" name="custom-repeat" value="1" checked />1回</label><label><input type="radio" name="custom-repeat" value="2" />2回</label></div>
@@ -346,6 +359,11 @@
             >CC BY 4.0</a
           >／加工あり
         </p>
+      </section>
+      <section class="credits-section" aria-labelledby="credits-voice-title">
+        <h3 id="credits-voice-title">音声読み上げ</h3>
+        <p><a href="https://voicevox.hiroshiba.jp/term/" data-credit="voicevox">VOICEVOX 利用規約</a></p>
+        <div id="voicevox-used-credits"></div>
       </section>
       <section class="credits-section" aria-labelledby="credits-library-title">
         <h3 id="credits-library-title">アイコン・ライブラリ</h3>

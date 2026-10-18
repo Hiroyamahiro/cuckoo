@@ -195,8 +195,9 @@ impl Backend for Mp3Backend {
         }
         let result = (|| -> Result<Outcome, String> {
             // Declared first: released only AFTER sink/stream destruction.
-            let custom = crate::sound_library::id_valid(&r.sound_id);
-            let mut custom_pin = if custom {
+            let voice = crate::voicevox::id_valid(&r.sound_id);
+            let custom = crate::sound_library::id_valid(&r.sound_id) || voice;
+            let mut custom_pin = if custom && !voice {
                 Some(
                     self.library
                         .pin_for_playback(&r.sound_id)
@@ -205,7 +206,12 @@ impl Backend for Mp3Backend {
             } else {
                 None
             };
-            let pcm = if custom {
+            let mut _voice_pin = None;
+            let pcm = if voice {
+                let (pin,decoded)=crate::voicevox::read_pcm(&r.sound_id)?;
+                _voice_pin=Some(pin);
+                Some(crate::builtin_audio::TrackedPcm::new(decoded))
+            } else if custom {
                 #[cfg(any(test, feature = "audio-test-harness"))]
                 {
                     if fault == 7 {
@@ -430,7 +436,7 @@ impl Audio {
         deadline: Option<Instant>,
         sound_id: &str,
     ) -> Result<u64, String> {
-        if !crate::sound_library::id_valid(sound_id) {
+        if !crate::sound_library::id_valid(sound_id) && !crate::voicevox::id_valid(sound_id) {
             return Err("InvalidCustomId".into());
         }
         self.submit_source(automatic, repeat, volume, key, deadline, sound_id.into())
@@ -638,6 +644,7 @@ impl Audio {
         if ![1, 2].contains(&repeat) || !volume.is_finite() || !(0.0..=1.0).contains(&volume) {
             return Err("InvalidPlayback".into());
         }
+        let repeat=crate::voicevox::playback_repeat(&sound_id,repeat);
         if self.stop.load(Ordering::SeqCst) {
             return Err("AudioStopping".into());
         }
@@ -710,8 +717,10 @@ impl Audio {
         if ![1, 2].contains(&repeat) || !volume.is_finite() || !(0.0..=1.0).contains(&volume) {
             return Err("InvalidPlayback".into());
         }
+        let repeat=crate::voicevox::playback_repeat(sound_id,repeat);
         if crate::builtin_audio::find(sound_id).is_none()
             && !crate::sound_library::id_valid(sound_id)
+            && !crate::voicevox::id_valid(sound_id)
         {
             return Err("UnknownSoundId".into());
         }

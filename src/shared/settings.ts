@@ -12,12 +12,17 @@ export interface CustomChime {
   soundId: string;
   repeat: 1 | 2;
   volume: number;
+  speech?: import('./voicevox').Speech;
 }
 export function playbackRepeat(minute: number, hourlyRepeat: 1 | 2, halfHourlyRepeat:1|2=1): 1 | 2 {
   return minute === 0 ? hourlyRepeat : halfHourlyRepeat;
 }
 export interface Settings extends SoundSettings {
-  audioRouting?: {onHour:{soundId:string;repeat:1|2;volume?:number};onHalfHour:{soundId:string;repeat?:1|2;volume?:number}};
+  audioRouting?: {onHour:SoundRoute;onHalfHour:SoundRoute};
+  hourVoice?:RouteSpeech|null;
+  halfHourVoice?:RouteSpeech|null;
+  hourSoundId?:string;
+  halfHourSoundId?:string;
   hourVolume: number;
   halfHourVolume: number;
   customChimes: CustomChime[];
@@ -30,6 +35,8 @@ export interface Settings extends SoundSettings {
   slots: boolean[];
   theme: Theme;
 }
+export interface RouteSpeech {settings:import('./voicevox').Speech;clips:Record<string,string>}
+export interface SoundRoute {soundId:string;repeat?:1|2;volume?:number;speech?:RouteSpeech}
 export interface LegacySchedule {
   minute: 0 | 30;
   start: string;

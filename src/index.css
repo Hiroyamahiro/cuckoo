@@ -583,10 +583,12 @@ body::-webkit-scrollbar {
   height: 0;
 }
 
-.my-presets {
+.settings-card {
   margin: 18px 0;
   padding: 16px 16px;
-  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--background) 70%, transparent);
+  border-radius: 8px;
+  border: 1px solid var(--border);
 }
 .my-presets button {
   font-size: var(--font-small);
@@ -739,9 +741,10 @@ body::-webkit-scrollbar {
 :root[data-theme='dark'] .forest-background {
   background-image: url('../assets/img/background_forest_dark.png');
 }
-:root[data-forest='true'] fieldset {
+:root[data-forest='true'] .settings-card {
   background: color-mix(in srgb, var(--background) 70%, transparent);
   border-radius: 8px;
+  border: 1px solid var(--border);
 }
 /*:root[data-forest='true'] .hint,*/
 :root[data-forest='true'] .preset-difference {

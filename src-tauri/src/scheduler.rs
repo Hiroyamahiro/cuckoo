@@ -25,18 +25,22 @@ pub struct Chime {
     pub repeat: u64,
     pub volume: f32,
 }
+pub fn route_sound(route:&Value,minute:u32)->Option<&str>{
+    if route["speech"].is_object(){route["speech"]["clips"][minute.to_string()].as_str()}else{Some(route["soundId"].as_str().unwrap_or(crate::builtin_audio::DEFAULT_ID))}
+}
 pub fn due(minute: u32, s: &Value) -> Vec<Chime> {
     if s["enabled"] != true { return vec![]; }
     let mut events = vec![];
     if minute % 30 == 0 && s["slots"][(minute / 30) as usize] == true {
         let route = &s["audioRouting"][if minute % 60 == 0 { "onHour" } else { "onHalfHour" }];
-        events.push(Chime { key: "regular".into(), sound_id: route["soundId"].as_str().unwrap_or(crate::builtin_audio::DEFAULT_ID).into(),
-            repeat: repeat_for(minute % 60, s), volume: effective_volume(&s["volume"], &route["volume"]) });
+        if let Some(id)=route_sound(route,minute) {events.push(Chime { key: "regular".into(), sound_id: id.into(),
+            repeat: crate::voicevox::playback_repeat(id,repeat_for(minute % 60, s)), volume: effective_volume(&s["volume"], &route["volume"]) });
+        }
     }
     if let Some(custom) = s["customChimes"].as_array() {
         for c in custom.iter().filter(|c| c["enabled"] == true && c["minute"].as_u64() == Some(minute as u64)) {
             events.push(Chime { key: c["id"].as_str().unwrap_or("").into(), sound_id: c["soundId"].as_str().unwrap_or(crate::builtin_audio::DEFAULT_ID).into(),
-                repeat: c["repeat"].as_u64().unwrap_or(1), volume: effective_volume(&s["volume"], &c["volume"]) });
+                repeat: crate::voicevox::playback_repeat(c["soundId"].as_str().unwrap_or(""),c["repeat"].as_u64().unwrap_or(1)), volume: effective_volume(&s["volume"], &c["volume"]) });
         }
     }
     events

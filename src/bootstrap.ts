@@ -26,6 +26,11 @@ async function updateSettings(patch:Partial<Settings>):Promise<ClockStatus>{
 const presets = new PresetClient(getStatus,request=>invoke<PresetReply>('edit_preset',{...request}),status=>sync.accept(status));
 const sounds=new SoundClient(getStatus,request=>invoke<SoundReply>('audio_library_operation',{...request}),(sessionId,requestId)=>invoke<SoundReply>('audio_library_receipt',{sessionId,requestId}),status=>sync.accept(status));
 window.cuckoo={
+ checkVoicevox:()=>invoke('voicevox_check'),
+ voicevoxPolicy:uuid=>invoke('voicevox_policy',{uuid}),
+ voicevoxThumbnail:(uuid,styleId)=>invoke('voicevox_thumbnail',{uuid,styleId}),
+ generateSpeech:(speech,minute,force)=>invoke('voicevox_generate',{speech,minute,force}),
+ protectSpeechEditor:(session,ids)=>invoke('voicevox_protect_editor',{session,ids}),
  getUpdateStatus:()=>invoke<UpdateStatus>('update_status'),
  updateAction:action=>invoke('update_action',{action}),
  onUpdateStatus:cb=>{updateCallbacks.add(cb);return()=>{updateCallbacks.delete(cb)}},

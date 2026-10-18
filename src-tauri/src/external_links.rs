@@ -1,8 +1,12 @@
 //! IDs, never user-supplied URLs, arguments, or executables cross this boundary.
 pub fn target(id: &str) -> Result<&'static str, String> {
     match id {
+        "voicevoxDownload" => Ok("https://voicevox.hiroshiba.jp/"),
         "otologic" => Ok("https://otologic.jp/"),
         "license" => Ok("https://creativecommons.org/licenses/by/4.0/"),
+        "voicevox" => Ok("https://voicevox.hiroshiba.jp/term/"),
+        "zundamon" => Ok("https://zunko.jp/con_ongen_kiyaku.html"),
+        "himari" => Ok("https://www.meimeihimari.com/terms-of-use"),
         _ => Err("クレジットリンクが不正です。".into()),
     }
 }

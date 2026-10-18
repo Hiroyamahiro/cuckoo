@@ -51,10 +51,6 @@ function chooseMinimum(minimumDisplay: boolean): void {
   change({ minimumDisplay });
 }
 const masterVolume = new RouteVolume(element('master-volume'), value => change({volume: value}), {id:'volume', outputId:'volume-value', titleId:'volume-title', iconId:'volume-icon', label:'全体の音量', heading:true});
-const repeats = [
-  ...document.querySelectorAll<HTMLInputElement>('[name="hourly-repeat"]'),
-];
-const halfRepeats=[...document.querySelectorAll<HTMLInputElement>('[name="half-hourly-repeat"]')];
 const presets = [
   ...document.querySelectorAll<HTMLButtonElement>('[data-preset]'),
 ];
@@ -75,8 +71,6 @@ const soundControls=new SoundControls(async <T>(action:()=>Promise<T>):Promise<T
   const task=updates.then(action);updates=task.then(()=>{},()=>{});
   try{return await task;}finally{pending--;soundBusy=false;await refresh();}
 });
-const hourVolume = new RouteVolume(element('hour-volume'), hourVolume => change({hourVolume}));
-const halfVolume = new RouteVolume(element('half-volume'), halfHourVolume => change({halfHourVolume}));
 const customChimes = new CustomChimes(async edit => {
   if (soundBusy || lastStatus?.soundManagement?.busy) throw new Error('音源操作が完了してから変更してください。');
   requestVersion++; pending++;
@@ -161,8 +155,6 @@ function render(status: ClockStatus, controls = false): void {
   soundControls.update(status);
   customChimes.update(status);
   dial.setCustomChimes(status.settings.customChimes ?? []);
-  hourVolume.sync(status.settings.hourVolume ?? 100, editable);
-  halfVolume.sync(status.settings.halfHourVolume ?? 100, editable);
   myPresets.setWritable(editable);
   if (pending === 0 || controls)
     requestedMinimum = status.settings.minimumDisplay;
@@ -193,7 +185,8 @@ function render(status: ClockStatus, controls = false): void {
   next.dataset.empty = String(!status.enabled || status.next === null);
   nextDate.textContent = upcoming.date;
   test.disabled = previewBlocked(status) || testing || pending > 0;
-  test.textContent=previewLabel(status,status.settings.audioRouting?.onHour.soundId,'試聴');
+  const route=status.settings.audioRouting?.onHour;
+  test.textContent=previewLabel(status,route?.speech?.clips[new Date().getHours()*60]??route?.soundId,'試聴');
   const feedback=settingsFeedback(status);
   settingsError.textContent = feedback.text;
   settingsError.dataset.tone=feedback.tone;
@@ -204,10 +197,6 @@ function render(status: ClockStatus, controls = false): void {
     ? status.audio.message||'音声処理の停止を確認できません。再生操作を停止しています。' : '';
   if (pending === 0 || controls) {
     dial.setSlots(status.settings.slots);
-    for (const radio of repeats)
-      radio.checked = Number(radio.value) === status.settings.hourlyRepeat;
-    for (const radio of halfRepeats)
-      radio.checked = Number(radio.value) === (status.settings.halfHourlyRepeat??1);
   }
   if (pending === 0 || controls) {
     masterVolume.sync(status.settings.volume, editable);
@@ -270,12 +259,6 @@ async function refresh(): Promise<void> {
   }
 }
 clockMode.addEventListener('click', () => chooseMinimum(!requestedMinimum));
-for (const radio of [...repeats,...halfRepeats])
-  radio.addEventListener('change', () => {
-    if (radio.checked) change(radio.name==='hourly-repeat'
-      ? {hourlyRepeat:Number(radio.value) as 1|2}
-      : {halfHourlyRepeat:Number(radio.value) as 1|2});
-  });
 for (const button of presets)
   button.addEventListener('click', () => {
     const slots = applyBulkSlots(displayedSlots, Number(button.dataset.ring ?? 0) as Ring, button.dataset.preset as BulkAction);
