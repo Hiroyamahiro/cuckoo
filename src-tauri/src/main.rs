@@ -207,9 +207,9 @@ fn get_status(state: tauri::State<Arc<State>>) -> Value {
     status(&state)
 }
 #[tauri::command]
-fn update_settings(
+async fn update_settings(
     app: tauri::AppHandle,
-    state: tauri::State<Arc<State>>,
+    state: tauri::State<'_, Arc<State>>,
     session_id: String,
     base_revision: u64,
     request_id: String,
@@ -221,6 +221,14 @@ fn update_settings(
     state
         .settings
         .apply(&session_id, base_revision, &request_id, &patch)?;
+    if patch.get("customChimes").is_some() {
+        let settings = state.settings.clone();
+        let receipt = tauri::async_runtime::spawn_blocking(move || settings.wait_preset(&request_id, std::time::Duration::from_secs(5)))
+            .await.map_err(|e| e.to_string())?;
+        if receipt["state"] != "saved" {
+            return Err(receipt["code"].as_str().unwrap_or("保存結果が未確定です。設定の状態を確認してください。").into());
+        }
+    }
     changed(&app, &state);
     Ok(status(&state))
 }
@@ -291,7 +299,7 @@ fn submit_routed(
 }
 fn play(state: &State, repeat: u64) -> Result<u64, String> {
     let s = state.settings.snapshot();
-    let volume = s["volume"].as_f64().unwrap_or(50.) as f32 / 100.;
+    let volume = scheduler::effective_volume(&s["volume"], &s["audioRouting"]["onHour"]["volume"]);
     let id = s["audioRouting"]["onHour"]["soundId"]
         .as_str()
         .unwrap_or(builtin_audio::DEFAULT_ID);
@@ -347,7 +355,7 @@ fn test_sound(
     state.audio.toggle_preview(
         &id,
         repeat,
-        s["volume"].as_f64().unwrap_or(50.) as f32 / 100.,
+        scheduler::effective_volume(&s["volume"], &s["audioRouting"]["onHour"]["volume"]),
     )
 }
 #[tauri::command]
@@ -872,7 +880,8 @@ fn main() {
                 .name("cuckoo-clock".into())
                 .spawn(move || {
                     let mut scheduler = scheduler::Scheduler::default();
-                    let mut pending: Option<(String, u64, f32, std::time::Instant, String)> = None;
+                    let mut pending: std::collections::VecDeque<(String, scheduler::Chime, std::time::Instant, u32)> = std::collections::VecDeque::new();
+                    let mut last_auto = None;
                     while !worker.stop.load(Ordering::SeqCst) {
                         worker.ticks.fetch_add(1, Ordering::SeqCst);
                         let now = Local::now();
@@ -880,47 +889,31 @@ fn main() {
                         let (fire, gap) = scheduler.poll(now, std::time::Instant::now(), &s);
                         if gap && worker.ticks.load(Ordering::SeqCst) > 1 {
                             worker.audio.cancel();
-                            pending = None;
+                            pending.clear();
                         }
+                        if s["enabled"] != true { pending.clear(); }
                         if fire {
-                            eprintln!("CHIME {}", now.to_rfc3339());
-                            let repeat = scheduler::repeat_for(now.minute(), &s);
-                            let lateness =
-                                now.second() as u64 * 1000 + now.timestamp_subsec_millis() as u64;
-                            pending = Some((
-                                now.format("%Y-%m-%d-%H-%M").to_string(),
-                                repeat,
-                                s["volume"].as_f64().unwrap_or(50.) as f32 / 100.,
-                                std::time::Instant::now()
-                                    + std::time::Duration::from_millis(
-                                        2000u64.saturating_sub(lateness),
-                                    ),
-                                s["audioRouting"][if now.minute() == 30 {
-                                    "onHalfHour"
-                                } else {
-                                    "onHour"
-                                }]["soundId"]
-                                    .as_str()
-                                    .unwrap_or(builtin_audio::DEFAULT_ID)
-                                    .to_string(),
-                            ));
+                            let minute = now.hour() * 60 + now.minute();
+                            let lateness = now.second() as u64 * 1000 + now.timestamp_subsec_millis() as u64;
+                            for (index, event) in scheduler::due(minute, &s).into_iter().enumerate() {
+                                let key = format!("{}-{}", now.format("%Y-%m-%d-%H-%M"), event.key);
+                                // A simultaneous second chime waits for the first; never mix them.
+                                let wait_ms = if index == 0 { 2000u64.saturating_sub(lateness) } else { 125000 };
+                                pending.push_back((key, event, std::time::Instant::now() + std::time::Duration::from_millis(wait_ms), minute));
+                            }
                         }
-                        if let Some((key, repeat, volume, deadline, sound_id)) = pending.take() {
-                            if std::time::Instant::now() > deadline {
-                                eprintln!("CHIME_SKIPPED {key} DeadlineExceeded");
-                            } else if let Err(e) = submit_routed(
-                                &worker,
-                                true,
-                                repeat,
-                                volume,
-                                Some(&key),
-                                Some(deadline),
-                                &sound_id,
-                            ) {
-                                if e == "AudioMailboxBusy" {
-                                    pending = Some((key, repeat, volume, deadline, sound_id));
-                                } else {
-                                    eprintln!("chime: {e}");
+                        let completed = last_auto.is_none_or(|id| worker.audio.receipt(id).is_none_or(|r| r.outcome.is_some()));
+                        if completed {
+                            if let Some((key, event, deadline, minute)) = pending.pop_front() {
+                                // Re-evaluate pending events after edits or disabling/removal.
+                                if let Some(current) = scheduler::due(minute, &s).into_iter().find(|c| c.key == event.key) {
+                                    if std::time::Instant::now() <= deadline {
+                                        match submit_routed(&worker, true, current.repeat, current.volume, Some(&key), Some(deadline), &current.sound_id) {
+                                            Ok(id) => last_auto = Some(id),
+                                            Err(e) if e == "AudioMailboxBusy" => pending.push_front((key, current, deadline, minute)),
+                                            Err(e) => eprintln!("chime: {e}"),
+                                        }
+                                    }
                                 }
                             }
                         }

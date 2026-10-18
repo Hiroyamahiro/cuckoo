@@ -33,7 +33,7 @@ window.cuckoo={
  listSources:async()=>{const reply=await invoke<SoundList>('list_audio_sources');reply.status=sync.accept(reply.status);return reply;},
  soundOperation:action=>sounds.run(action),
  confirmSoundOperation:()=>sounds.confirm(),
- previewSource:async(target,soundId)=>{claimPreviewClick();await invoke<number>('preview_audio_source',{target,soundId:soundId??null});await getStatus();},
+ previewSource:async(target,soundId,repeat,volume)=>{claimPreviewClick();await invoke<number>('preview_audio_source',{target,soundId:soundId??null,repeat:repeat??null,volume:volume??null});await getStatus();},
  getStatus,
  onStatusChanged:cb=>{callbacks.add(cb);return()=>{callbacks.delete(cb)}},
  setEnabled:enabled=>updateSettings({enabled}),

@@ -75,7 +75,7 @@ export class SoundControls {
   for(const [button,id,label]of [['hour-preview',routing?.onHour.soundId,'試聴'],['half-preview',routing?.onHalfHour.soundId,'試聴']]as const){const b=el<HTMLButtonElement>(button);b.disabled=this.busy||previewBlocked(s);b.textContent=previewLabel(s,id,label);}
   const list=el('custom-sounds');const rows=this.sources.filter(x=>x.kind==='custom');el('sound-empty').hidden=rows.length>0;
   // Replace rows only when their meaningful state changes; retain focused buttons.
-  const signature=JSON.stringify(rows.map(x=>[x.id,x.name,x.available,x.pinned]))+JSON.stringify(routing)+String(writable)+String(this.busy)+String(previewBlocked(s))+JSON.stringify(s.audio?.preview)+JSON.stringify(s.audio?.active);
+  const signature=JSON.stringify(rows.map(x=>[x.id,x.name,x.available,x.pinned]))+JSON.stringify(routing)+JSON.stringify(s.settings.customChimes)+String(writable)+String(this.busy)+String(previewBlocked(s))+JSON.stringify(s.audio?.preview)+JSON.stringify(s.audio?.active);
   if(list.dataset.rows!==signature){list.dataset.rows=signature;list.replaceChildren(...rows.map(source=>{
    const li=document.createElement('li');li.dataset.soundId=source.id;
    const name=document.createElement('strong');name.textContent=source.name;

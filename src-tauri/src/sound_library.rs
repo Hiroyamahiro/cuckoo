@@ -295,10 +295,7 @@ pub(crate) fn rebind_settings_backup(
     } else {
         Catalog::default()
     };
-    for id in [
-        &doc.audio.on_hour.sound_id,
-        &doc.audio.on_half_hour.sound_id,
-    ] {
+    for id in doc.selected_sounds() {
         if id_valid(id) {
             let before = historical
                 .sounds

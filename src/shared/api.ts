@@ -53,7 +53,7 @@ export interface CuckooApi {
   listSources():Promise<SoundList>;
   soundOperation(action:SoundAction):Promise<SoundReply>;
   confirmSoundOperation():Promise<SoundReply>;
-  previewSource(target:'hour'|'halfHour'|'one',soundId?:string):Promise<void>;
+  previewSource(target:'hour'|'halfHour'|'one'|'custom',soundId?:string,repeat?:1|2,volume?:number):Promise<void>;
   getStatus(): Promise<ClockStatus>;
   onStatusChanged(callback: (status: ClockStatus) => void): () => void;
   setEnabled(enabled: boolean): Promise<ClockStatus>;

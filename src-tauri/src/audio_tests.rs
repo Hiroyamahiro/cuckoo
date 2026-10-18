@@ -137,6 +137,16 @@ fn outcome(a: &Audio, id: u64) -> Outcome {
     until(|| a.receipt(id).unwrap().outcome.is_some());
     a.receipt(id).unwrap().outcome.unwrap()
 }
+fn accepted(mut submit: impl FnMut() -> Result<u64, String>) -> u64 {
+    let end = Instant::now() + Duration::from_secs(1);
+    loop {
+        match submit() {
+            Ok(id) => return id,
+            Err(e) if e == "AudioMailboxBusy" => { assert!(Instant::now() < end); thread::sleep(POLL); }
+            Err(e) => panic!("{e}"),
+        }
+    }
+}
 fn close(a: &Audio) {
     assert!(a.shutdown(Duration::from_secs(1)))
 }
@@ -151,6 +161,24 @@ fn normal_test_and_two_iterations_keep_250ms_gap() {
     assert_eq!(a.snapshot().state, Phase::Ready);
     drop(t);
     close(&a);
+}
+#[test]
+fn regular_and_custom_chimes_at_same_minute_complete_sequentially() {
+    let (audio, fake) = boot(vec![Step::Normal, Step::Normal]);
+    let settings = serde_json::json!({"enabled":true,"slots":vec![true;48],"volume":50,
+        "hourlyRepeat":1,"audioRouting":{"onHour":{"soundId":crate::builtin_audio::DEFAULT_ID,"volume":60}},
+        "customChimes":[{"id":"custom","minute":540,"enabled":true,"soundId":crate::builtin_audio::DEFAULT_ID,"repeat":2,"volume":80}]});
+    let mut ids = vec![];
+    for event in crate::scheduler::due(540, &settings) {
+        if let Some(previous) = ids.last() { assert_eq!(outcome(&audio, *previous), Outcome::Completed); }
+        let id = accepted(|| audio.submit_builtin(true, event.repeat, event.volume, Some(&event.key), Some(Instant::now()+Duration::from_secs(2)), &event.sound_id));
+        ids.push(id);
+    }
+    assert_eq!(outcome(&audio, ids[1]), Outcome::Completed);
+    let trace = fake.trace.lock().unwrap();
+    assert_eq!(trace.iter().map(|t| t.0).collect::<Vec<_>>(), vec![ids[0],ids[1],ids[1]]);
+    assert_eq!(fake.max.load(Ordering::SeqCst), 1);
+    drop(trace); close(&audio);
 }
 #[test]
 fn scheduled_zero_repeat_one_two_and_half_hour_one() {
@@ -327,15 +355,13 @@ fn default_mp3_has_finite_duration() {
 #[test]
 fn preparation_deadline_requests_cancel_and_reports_failure_not_completion() {
     let (a, _) = boot(vec![Step::Preparing]);
-    let id = a
-        .submit(
+    let id = accepted(|| a.submit(
             true,
             1,
             0.5,
             Some("deadline"),
             Some(Instant::now() + Duration::from_millis(40)),
-        )
-        .unwrap();
+        ));
     assert_eq!(outcome(&a, id), Outcome::Failed("PlaybackTimeout".into()));
     assert_eq!(a.snapshot().state, Phase::Failed);
     close(&a);
@@ -467,8 +493,18 @@ fn custom_boot() -> (
     (audio, backend, library, sound, blob)
 }
 fn custom_submit(a: &Audio, id: &str, repeat: u64) -> u64 {
-    a.submit_custom(false, repeat, 0.37, None, None, id)
-        .unwrap()
+    let end = Instant::now() + Duration::from_secs(1);
+    loop {
+        match a.submit_custom(false, repeat, 0.37, None, None, id) {
+            Ok(request) => return request,
+            // Ready can be published while the coordinator briefly owns its
+            // mailbox lock. Match the existing builtin test helper's contract.
+            Err(e) if e == "AudioMailboxBusy" => {
+                assert!(Instant::now() < end); thread::sleep(POLL);
+            }
+            Err(e) => panic!("{e}"),
+        }
+    }
 }
 #[test]
 fn custom_normal_repeat_and_half_hour_use_sequential_gap_and_release_pin() {

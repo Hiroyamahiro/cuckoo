@@ -18,8 +18,8 @@
 #custom-sounds strong {font-size:13px;font-weight:500;flex:1 1 10rem;overflow-wrap:anywhere;}
 #custom-sounds span {flex:1 1 100%;font-size:12px;}
 .sound-actions {display:flex;align-items:center;gap:.5rem;justify-content:flex-end;margin-top:.75rem;flex-wrap:wrap;}
-#test,.sound-panel button,.sound-actions button {font:inherit;font-size:var(--font-small);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--button-radius);padding:.45rem .65rem;cursor:pointer;}
-#test:hover:not(:disabled),.sound-panel button:hover:not(:disabled),.sound-actions button:hover:not(:disabled) {background:var(--button-hover-background);}
+#test,.sound-panel button,.sound-actions button,.sound-preview {font:inherit;font-size:var(--font-small);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--button-radius);padding:.45rem .65rem;cursor:pointer;}
+#test:hover:not(:disabled),.sound-panel button:hover:not(:disabled),.sound-actions button:hover:not(:disabled),.sound-preview:hover:not(:disabled) {background:var(--button-hover-background);}
 @media(max-width:540px){.sound-route{grid-template-columns:1fr auto;}.sound-route label{grid-column:1/-1;}}
 
 

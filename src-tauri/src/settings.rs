@@ -1,6 +1,9 @@
 //! Rust-owned MemorySettings survive WebView lifetimes; one worker persists them.
 //! Neither IPC nor startup arguments can choose a disk path.
 #[cfg(test)]
+#[path = "custom_chime_tests.rs"]
+mod custom_chime_tests;
+#[cfg(test)]
 #[path = "settings_e1_tests.rs"]
 mod e1_tests;
 #[cfg(test)]
@@ -257,6 +260,9 @@ impl MemorySettings {
         json!({"settings":i.doc.projection(),"audioRoutingAvailability":i.availability,"settingsSync":metadata(&i),"saveState":i.save,"settingsNotice":notice})
     }
     pub fn apply(&self, session: &str, base: u64, id: &str, patch: &Value) -> Result<(), String> {
+        if patch.get("customChimes").is_some() {
+            return self.submit_change(session, base, id, &json!({"type":"custom-chimes","patch":patch}));
+        }
         let mut i = self.inner.lock().unwrap();
         if session != i.session {
             return Err("SessionConflict".into());
@@ -320,7 +326,7 @@ impl MemorySettings {
         request_id: &str,
         action: &Value,
     ) -> Result<(), String> {
-        if action["type"] == "select-sound" {
+        if action["type"] == "select-sound" || action["type"] == "custom-chimes" {
             return Err("InvalidPresetAction".into());
         }
         self.submit_change(session, base, request_id, action)
@@ -378,6 +384,8 @@ impl MemorySettings {
                 )?,
                 action["soundId"].as_str().unwrap().to_string(),
             )
+        } else if action["type"] == "custom-chimes" {
+            (i.doc.patched(&action["patch"])?, String::new())
         } else {
             i.doc.edit_preset(action)?
         };

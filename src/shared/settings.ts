@@ -5,11 +5,22 @@ export interface SoundSettings {
   halfHourlyRepeat: 1 | 2;
   volume: number;
 }
+export interface CustomChime {
+  id: string;
+  minute: number;
+  enabled: boolean;
+  soundId: string;
+  repeat: 1 | 2;
+  volume: number;
+}
 export function playbackRepeat(minute: number, hourlyRepeat: 1 | 2, halfHourlyRepeat:1|2=1): 1 | 2 {
   return minute === 0 ? hourlyRepeat : halfHourlyRepeat;
 }
 export interface Settings extends SoundSettings {
-  audioRouting?: {onHour:{soundId:string;repeat:1|2};onHalfHour:{soundId:string;repeat?:1|2}};
+  audioRouting?: {onHour:{soundId:string;repeat:1|2;volume?:number};onHalfHour:{soundId:string;repeat?:1|2;volume?:number}};
+  hourVolume: number;
+  halfHourVolume: number;
+  customChimes: CustomChime[];
   version: 6;
   minimumDisplay: boolean;
   backgroundIllustration: boolean;

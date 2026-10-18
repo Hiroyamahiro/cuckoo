@@ -416,21 +416,17 @@ impl Store {
         let old = read(&self.path())?.and_then(|b| settings_model::decode(&b).ok());
         // Unchanged unavailable selections remain visible as unavailable; newly selected IDs must be valid.
         let mut guards = vec![];
-        for (id, previous) in [
-            (
-                &doc.audio.on_hour.sound_id,
-                old.as_ref().map(|d| &d.audio.on_hour.sound_id),
-            ),
-            (
-                &doc.audio.on_half_hour.sound_id,
-                old.as_ref().map(|d| &d.audio.on_half_hour.sound_id),
-            ),
-        ] {
+        let mut selections = vec![
+            (&doc.audio.on_hour.sound_id, old.as_ref().map(|d| &d.audio.on_hour.sound_id)),
+            (&doc.audio.on_half_hour.sound_id, old.as_ref().map(|d| &d.audio.on_half_hour.sound_id)),
+        ];
+        selections.extend(doc.schedule.custom.iter().map(|c| (
+            &c.sound_id,
+            old.as_ref().and_then(|d| d.schedule.custom.iter().find(|previous| previous.id == c.id)).map(|c| &c.sound_id),
+        )));
+        for (id, previous) in selections {
             if previous != Some(id) {
-                guards.push(
-                    crate::sound_library::hold_reference(&self.root, &catalog, id)
-                        .map_err(library_error)?,
-                );
+                guards.push(crate::sound_library::hold_reference(&self.root, &catalog, id).map_err(library_error)?);
             }
         }
         let mut candidate = doc.clone();
@@ -471,10 +467,7 @@ impl Store {
         } else {
             self.check_catalog(doc)?
         };
-        for id in [
-            &doc.audio.on_hour.sound_id,
-            &doc.audio.on_half_hour.sound_id,
-        ] {
+        for id in doc.selected_sounds() {
             if crate::sound_library::id_valid(id) && !catalog.sounds.iter().any(|s| &s.id == id) {
                 return Err(err("SoundSelected"));
             }
@@ -648,7 +641,7 @@ impl Store {
         d.upgrade();
         crate::sound_library::rebind_settings_backup(&self.root, &mut d).map_err(library_error)?;
         let catalog = self.check_catalog(&d)?;
-        for id in [&d.audio.on_hour.sound_id, &d.audio.on_half_hour.sound_id] {
+        for id in d.selected_sounds() {
             crate::sound_library::validate_reference(&self.root, &catalog, id)
                 .map_err(library_error)?;
         }

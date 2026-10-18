@@ -191,6 +191,8 @@ pub fn preview_audio_source(
     window: tauri::WebviewWindow,
     target: String,
     sound_id: Option<String>,
+    repeat: Option<u8>,
+    volume: Option<u8>,
 ) -> Result<u64, String> {
     current_window(&app, &window)?;
     let state = app.state::<Arc<State>>();
@@ -203,7 +205,15 @@ pub fn preview_audio_source(
     {
         return Err("ChimeImminent".into());
     }
-    let (id, repeat) = match target.as_str() {
+    let (id, playback_repeat, gain) = preview_plan(&s, &target, sound_id, repeat, volume)?;
+    state.audio.toggle_preview(&id, playback_repeat, gain)
+}
+
+fn preview_plan(s: &Value, target: &str, sound_id: Option<String>, repeat: Option<u8>, volume: Option<u8>) -> Result<(String, u64, f32), String> {
+    if repeat.is_some_and(|r| ![1, 2].contains(&r)) || volume.is_some_and(|v| v > 100) {
+        return Err("InvalidPlayback".into());
+    }
+    let (id, playback_repeat) = match target {
         "hour" => (
             s["audioRouting"]["onHour"]["soundId"]
                 .as_str()
@@ -219,11 +229,27 @@ pub fn preview_audio_source(
             s["halfHourlyRepeat"].as_u64().unwrap_or(1),
         ),
         "one" => (sound_id.ok_or("MissingSoundId")?, 1),
+        "custom" => (sound_id.ok_or("MissingSoundId")?, repeat.unwrap_or(1) as u64),
         _ => return Err("InvalidTarget".into()),
     };
-    state.audio.toggle_preview(
-        &id,
-        repeat,
-        s["volume"].as_f64().unwrap_or(50.) as f32 / 100.,
-    )
+    let individual = if target == "custom" { json!(volume.unwrap_or(100)) }
+        else { s["audioRouting"][match target { "hour" => "onHour", "halfHour" => "onHalfHour", _ => "" }]["volume"].clone() };
+    let gain = scheduler::effective_volume(&s["volume"], &individual);
+    Ok((id, playback_repeat, gain))
+}
+#[cfg(test)]
+mod preview_plan_tests {
+    use super::*;
+    #[test]
+    fn preview_uses_draft_repeat_and_individual_gain_without_double_master_gain() {
+        let s = json!({"volume":50,"hourlyRepeat":2,"halfHourlyRepeat":1,"audioRouting":{"onHour":{"soundId":"builtin:cuckoo-clock","volume":80},"onHalfHour":{"soundId":"builtin:church-bell","volume":60}}});
+        let (id, repeat, volume) = preview_plan(&s,"custom",Some("builtin:school-bell".into()),Some(2),Some(80)).unwrap();
+        assert_eq!(id,"builtin:school-bell"); assert_eq!(repeat,2); assert_eq!(volume,0.4);
+        assert_eq!(preview_plan(&s,"hour",None,None,None).unwrap().2,0.4);
+        assert_eq!(preview_plan(&s,"halfHour",None,None,None).unwrap().2,0.3);
+        assert_eq!(preview_plan(&s,"custom",Some(id.clone()),Some(1),Some(0)).unwrap().2,0.0);
+        assert!(preview_plan(&s,"custom",Some(id.clone()),Some(3),Some(80)).is_err());
+        assert!(preview_plan(&s,"custom",Some(id),Some(1),Some(101)).is_err());
+        assert!(preview_plan(&s,"custom",None,None,None).is_err());
+    }
 }

@@ -14,17 +14,48 @@ pub fn repeat_for(minute: u32, s: &Value) -> u64 {
         s["halfHourlyRepeat"].as_u64().unwrap_or(1)
     }
 }
+pub fn effective_volume(master: &Value, individual: &Value) -> f32 {
+    (master.as_f64().unwrap_or(50.).clamp(0., 100.)
+        * individual.as_f64().unwrap_or(100.).clamp(0., 100.) / 10000.) as f32
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct Chime {
+    pub key: String,
+    pub sound_id: String,
+    pub repeat: u64,
+    pub volume: f32,
+}
+pub fn due(minute: u32, s: &Value) -> Vec<Chime> {
+    if s["enabled"] != true { return vec![]; }
+    let mut events = vec![];
+    if minute % 30 == 0 && s["slots"][(minute / 30) as usize] == true {
+        let route = &s["audioRouting"][if minute % 60 == 0 { "onHour" } else { "onHalfHour" }];
+        events.push(Chime { key: "regular".into(), sound_id: route["soundId"].as_str().unwrap_or(crate::builtin_audio::DEFAULT_ID).into(),
+            repeat: repeat_for(minute % 60, s), volume: effective_volume(&s["volume"], &route["volume"]) });
+    }
+    if let Some(custom) = s["customChimes"].as_array() {
+        for c in custom.iter().filter(|c| c["enabled"] == true && c["minute"].as_u64() == Some(minute as u64)) {
+            events.push(Chime { key: c["id"].as_str().unwrap_or("").into(), sound_id: c["soundId"].as_str().unwrap_or(crate::builtin_audio::DEFAULT_ID).into(),
+                repeat: c["repeat"].as_u64().unwrap_or(1), volume: effective_volume(&s["volume"], &c["volume"]) });
+        }
+    }
+    events
+}
 pub fn next(now: DateTime<Local>, s: &Value) -> Option<i64> {
     if s["enabled"] != true {
         return None;
     }
+    let mut minutes = std::collections::BTreeSet::new();
+    for slot in 0..48 { if s["slots"][slot] == true { minutes.insert(slot as u32 * 30); } }
+    if let Some(custom) = s["customChimes"].as_array() {
+        for c in custom.iter().filter(|c| c["enabled"] == true) {
+            if let Some(minute) = c["minute"].as_u64().filter(|m| *m < 1440) { minutes.insert(minute as u32); }
+        }
+    }
     for day in 0..=8 {
         let date = now.date_naive() + chrono::Duration::days(day);
-        for i in 0..48 {
-            if s["slots"][i] != true {
-                continue;
-            }
-            let naive = date.and_hms_opt((i / 2) as u32, if i % 2 == 0 { 0 } else { 30 }, 0)?;
+        for &i in &minutes {
+            let naive = date.and_hms_opt(i / 60, i % 60, 0)?;
             if let Some(t) = Local.from_local_datetime(&naive).earliest() {
                 if t > now {
                     return Some(t.timestamp_millis());
@@ -56,7 +87,7 @@ impl Scheduler {
             .unwrap_or(true);
         let previous = self.wall.replace(wall);
         self.mono = Some(mono);
-        let revision = serde_json::json!([s["enabled"], s["slots"]]);
+        let revision = serde_json::json!([s["enabled"], s["slots"], s["customChimes"]]);
         let changed = self.revision != revision;
         self.revision = revision;
         self.history
@@ -65,11 +96,9 @@ impl Scheduler {
             return (false, jumped);
         }
         let boundary = wall - (now.second() as i64 * 1000 + now.timestamp_subsec_millis() as i64);
-        let slot = (now.hour() * 2 + now.minute() / 30) as usize;
-        if now.minute() % 30 != 0
+        if due(now.hour() * 60 + now.minute(), s).is_empty()
             || wall - boundary > 2000
             || previous.unwrap_or(wall) >= boundary
-            || s["slots"][slot] != true
         {
             return (false, false);
         }
@@ -78,7 +107,7 @@ impl Scheduler {
             return (false, false);
         }
         self.history.push_back((key, mono));
-        while self.history.len() > 384 {
+        while self.history.len() > 7 * 1440 {
             self.history.pop_front();
         }
         (true, false)

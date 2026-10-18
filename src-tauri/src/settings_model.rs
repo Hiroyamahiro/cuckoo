@@ -39,7 +39,21 @@ pub struct Document {
 pub struct Schedule {
     pub enabled: bool,
     pub slots: Vec<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub custom: Vec<CustomChime>,
 }
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CustomChime {
+    pub id: String,
+    pub minute: u16,
+    pub enabled: bool,
+    pub sound_id: String,
+    pub repeat: u8,
+    pub volume: u8,
+}
+fn full_volume() -> u8 { 100 }
+fn is_full_volume(value: &u8) -> bool { *value == 100 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Appearance {
@@ -61,6 +75,8 @@ pub struct Audio {
 pub struct OnHour {
     pub sound_id: String,
     pub repeat: u8,
+    #[serde(default = "full_volume", skip_serializing_if = "is_full_volume")]
+    pub volume: u8,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -68,6 +84,8 @@ pub struct OnHalfHour {
     pub sound_id: String,
     #[serde(default = "one_repeat", skip_serializing_if = "is_one_repeat")]
     pub repeat: u8,
+    #[serde(default = "full_volume", skip_serializing_if = "is_full_volume")]
+    pub volume: u8,
 }
 fn one_repeat() -> u8 { 1 }
 fn is_one_repeat(value: &u8) -> bool { *value == 1 }
@@ -227,6 +245,8 @@ impl Document {
         }
         if self.schedule.slots.len() != 48
             || self.audio.volume > 100
+            || self.audio.on_hour.volume > 100
+            || self.audio.on_half_hour.volume > 100
             || ![1, 2].contains(&self.audio.on_hour.repeat)
             || ![1, 2].contains(&self.audio.on_half_hour.repeat)
             || (self.schema_version == 7 && self.audio.on_half_hour.repeat != 1)
@@ -246,6 +266,18 @@ impl Document {
         }
         if self.presets.len() > 100 {
             return Err("TooManyPresets".into());
+        }
+        let mut minutes = HashSet::new();
+        let mut custom_ids = HashSet::new();
+        for c in &self.schedule.custom {
+            if c.minute >= 1440 || !minutes.insert(c.minute) {
+                return Err("同じ時刻の時報は登録できません。時刻は00:00〜23:59で指定してください。".into());
+            }
+            if uuid::Uuid::parse_str(&c.id).is_err() || !custom_ids.insert(&c.id)
+                || c.volume > 100 || ![1, 2].contains(&c.repeat)
+                || c.sound_id == REMOVED_WAV || !sound_id_valid(&c.sound_id) {
+                return Err("InvalidCustomChime".into());
+            }
         }
         let mut ids = HashSet::new();
         let mut names = HashSet::new();
@@ -292,6 +324,7 @@ impl Document {
     pub fn projection(&self) -> Value {
         json!({"version":6,"enabled":self.schedule.enabled,"slots":self.schedule.slots,"presets":self.presets,
             "audioRouting":{"onHour":self.audio.on_hour,"onHalfHour":self.audio.on_half_hour},"soundId":"otologic-cuckoo-clock","hourlyRepeat":self.audio.on_hour.repeat,"halfHourlyRepeat":self.audio.on_half_hour.repeat,"volume":self.audio.volume,
+            "hourVolume":self.audio.on_hour.volume,"halfHourVolume":self.audio.on_half_hour.volume,"customChimes":self.schedule.custom,
             "theme":self.appearance.theme,"backgroundIllustration":self.appearance.background_illustration,"minimumDisplay":self.appearance.minimum_display})
     }
     pub fn patched(&self, patch: &Value) -> Result<Self, String> {
@@ -320,6 +353,15 @@ impl Document {
                     v.audio.on_half_hour.repeat = x.as_u64()
                         .and_then(|n| u8::try_from(n).ok()).ok_or("InvalidRepeat")?;
                 }
+                "hourVolume" | "halfHourVolume" => {
+                    let volume = x.as_u64().and_then(|n| u8::try_from(n).ok()).ok_or("InvalidVolume")?;
+                    if k == "hourVolume" { v.audio.on_hour.volume = volume; }
+                    else { v.audio.on_half_hour.volume = volume; }
+                }
+                "customChimes" => {
+                    v.schedule.custom = serde_json::from_value(x.clone()).map_err(|_| "InvalidCustomChime")?;
+                    v.schedule.custom.sort_by_key(|c| c.minute);
+                }
                 "theme" => v.appearance.theme = x.as_str().ok_or("InvalidTheme")?.into(),
                 "backgroundIllustration" => {
                     v.appearance.background_illustration = x.as_bool().ok_or("InvalidBackground")?
@@ -332,6 +374,11 @@ impl Document {
         }
         v.validate()?;
         Ok(v)
+    }
+    pub fn selected_sounds(&self) -> Vec<&String> {
+        let mut ids = vec![&self.audio.on_hour.sound_id, &self.audio.on_half_hour.sound_id];
+        ids.extend(self.schedule.custom.iter().map(|c| &c.sound_id));
+        ids
     }
 }
 

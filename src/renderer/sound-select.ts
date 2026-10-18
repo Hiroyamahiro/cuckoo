@@ -25,7 +25,11 @@ export class CustomSelect {
   const label=document.querySelector<HTMLLabelElement>(`label[for="${select.id}"]`);
   if(label){label.htmlFor=this.button.id;if(!label.id)label.id=select.id+'-label';this.button.setAttribute('aria-labelledby',label.id+' '+this.button.id+'-value');this.popup.setAttribute('aria-labelledby',label.id);}
   this.button.setAttribute('aria-controls',this.popup.id);
-  select.before(this.button);document.body.append(this.popup);
+  select.before(this.button);
+  const dialog=select.closest('dialog');
+  (dialog??document.body).append(this.popup);
+  dialog?.addEventListener('close',()=>this.close());
+  dialog?.addEventListener('cancel',event=>{if(this.open){event.preventDefault();this.close();}});
   this.button.addEventListener('click',()=>this.open?this.close():this.show());
   this.button.addEventListener('keydown',event=>this.key(event));
   document.addEventListener('pointerdown',event=>{if(this.open&&!this.popup.contains(event.target as Node)&&!this.button.contains(event.target as Node))this.close();});

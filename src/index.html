@@ -247,24 +247,22 @@
         </p>
         <fieldset id="settings" disabled>
           <legend class="sr-only">共通の設定</legend>
-          <div class="volume-control">
-            <label class="settings-section-title" for="volume"
-              >音量<output id="volume-value" for="volume">50%</output></label
-            >
-            <div class="volume-slider">
-              <span id="volume-icon" aria-hidden="true"></span>
-              <input id="volume" type="range" min="0" max="100" step="1" />
-            </div>
-          </div>
+          <div id="master-volume" class="volume-control"></div>
           <button id="test" type="button" disabled>試聴</button>
           <section id="sound-panel" class="sound-panel" aria-labelledby="sound-title">
             <h2 id="sound-title" class="settings-section-title">時報の音色</h2>
             <div class="sound-route"><label for="hour-sound">00分</label><select id="hour-sound" disabled></select><button id="hour-preview" type="button" disabled>試聴</button></div>
             <div class="tone-repeat" role="group" aria-label="00分の回数"><div class="repeat-options"><label><input type="radio" name="hourly-repeat" value="1" />1回</label><label><input type="radio" name="hourly-repeat" value="2" checked/>2回</label></div></div>
+            <div id="hour-volume" class="route-volume"></div>
             <p id="hour-sound-warning" class="sound-warning" role="status"></p>
             <div class="sound-route"><label for="half-sound">30分</label><select id="half-sound" disabled></select><button id="half-preview" type="button" disabled>試聴</button></div>
             <div class="tone-repeat" role="group" aria-label="30分の回数"><div class="repeat-options"><label><input type="radio" name="half-hourly-repeat" value="1" checked/>1回</label><label><input type="radio" name="half-hourly-repeat" value="2" />2回</label></div></div>
+            <div id="half-volume" class="route-volume"></div>
             <p id="half-sound-warning" class="sound-warning" role="status"></p>
+            <section id="custom-chimes" aria-labelledby="custom-chimes-title">
+              <div class="custom-chime-heading"><h2 id="custom-chimes-title" class="settings-section-title">時報の追加</h2><button id="custom-chime-add" type="button">＋ 追加</button></div>
+              <ul id="custom-chime-list"></ul>
+            </section>
             <details id="sound-management"><summary>音色の追加</summary>
               <p class="description">MP3形式・25MB・60秒まで、100件まで登録できます。<br>
                 元ファイルを移動・削除しても登録した音色は保持されます。</p>
@@ -281,6 +279,21 @@
       <p id="settings-error" role="alert"></p>
       <p id="audio-error" role="alert"></p>
     </main>
+    <dialog id="custom-chime-dialog" class="credits" aria-labelledby="custom-chime-title">
+      <form id="custom-chime-form">
+        <h2 id="custom-chime-title">時報の追加</h2>
+        <label class="settings-section-title" for="custom-chime-time-hour">時刻</label><div id="custom-chime-time"></div>
+        <label class="settings-section-title" for="custom-chime-sound">音色</label><select id="custom-chime-sound" required></select>
+        <div class="custom-repeat" role="group" aria-labelledby="custom-repeat-title">
+          <div id="custom-repeat-title" class="settings-section-title">再生回数</div>
+          <div class="repeat-options"><label><input type="radio" name="custom-repeat" value="1" checked />1回</label><label><input type="radio" name="custom-repeat" value="2" />2回</label></div>
+        </div>
+        <div id="custom-chime-volume" class="route-volume"></div>
+        <button id="custom-chime-preview" class="sound-preview" type="button">試聴</button>
+        <p id="custom-chime-error" class="sound-warning" role="alert"></p>
+        <div class="preset-dialog-buttons"><button id="custom-chime-cancel" type="button">キャンセル</button><button id="custom-chime-save" type="submit">保存</button></div>
+      </form>
+    </dialog>
     <dialog id="sound-rename-dialog" class="credits" aria-labelledby="sound-rename-title">
       <form id="sound-rename-form">
         <h2 id="sound-rename-title">登録名を変更</h2>

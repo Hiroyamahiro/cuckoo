@@ -125,10 +125,10 @@ export function generate() {
     }
     components.push({ ...c, name: c.name + version, texts });
   }
-  const fingerprint = hash(['src-tauri/Cargo.lock', manifest, 'package-lock.json', 'licenses/supplemental.json', 'src-tauri/tauri.conf.json'].map(f => fs.readFileSync(f, 'utf8')).join('\n'));
+  const fingerprint = hash(['src-tauri/Cargo.lock', manifest, 'package-lock.json', 'licenses/supplemental.json', 'src-tauri/tauri.conf.json'].map(f => fs.readFileSync(f, 'utf8').replace(/\r\n?/g, '\n')).join('\n'));
   const result = buildDocument(components, fingerprint);
   if (process.argv.includes('--check')) {
-    if (!fs.existsSync(output) || fs.readFileSync(output, 'utf8') !== result.html) throw new Error('Notices are stale; run npm run licenses:generate');
+    if (!fs.existsSync(output) || fs.readFileSync(output, 'utf8').replace(/\r\n?/g, '\n') !== result.html) throw new Error('Notices are stale; run npm run licenses:generate');
   } else {
     fs.mkdirSync(path.dirname(output), { recursive: true });
     fs.writeFileSync(output, result.html);

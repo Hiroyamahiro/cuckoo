@@ -1,0 +1,64 @@
+.route-volume {width:min(100%,var(--volume-control-width));min-width:0;margin:0 0 18px;}
+#settings {grid-template-columns:minmax(0,1fr) auto;}
+.route-volume-heading {display:flex;align-items:center;justify-content:space-between;font-size:var(--font-small);color:var(--muted);margin-bottom:8px;}
+.route-volume-heading output {font-size:var(--font-small);font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums;}
+.volume-slider {display:flex;align-items:center;gap:8px;min-height:20px;}
+.volume-icon {display:flex;flex:0 0 20px;width:20px;height:20px;color:var(--muted);pointer-events:none;}
+.volume-icon svg {width:100%;height:100%;stroke-width:1.75;}
+.route-volume input.volume-range {appearance:none;display:block;flex:1;min-width:0;width:100%;height:20px;margin:0;padding:0;border:0;border-radius:0;background:transparent;cursor:pointer;}
+.volume-range::-webkit-slider-runnable-track {height:3px;border-radius:2px;background:linear-gradient(to right,var(--accent) var(--volume-fill),var(--border) var(--volume-fill));}
+.volume-range::-webkit-slider-thumb {appearance:none;width:12px;height:12px;border-radius:50%;border:0;background:var(--accent);margin-top:-4.5px;}
+.volume-range::-moz-range-track {height:3px;border-radius:2px;background:var(--border);}
+.volume-range::-moz-range-progress {height:3px;background:var(--accent);}
+.volume-range::-moz-range-thumb {width:12px;height:12px;border-radius:50%;border:0;background:var(--accent);}
+.volume-range:focus-visible {outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--button-radius);}
+.volume-range:disabled {opacity:.5;cursor:default;}
+.custom-chime-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;}
+#custom-chimes {margin:20px 0;padding-top:18px;border-top:1px solid var(--border);}
+#custom-chimes h2 {margin:0;}
+#custom-chime-list {list-style:none;padding:0;margin:8px 0 0;}
+#custom-chime-list li {display:flex;align-items:center;gap:10px;padding:8px 0;}
+#custom-chime-list input {accent-color:var(--accent);}
+#custom-chime-list .custom-chime-edit {flex:0 0 4.5em;width:4.5em;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;font-size:var(--font-medium);}
+.custom-chime-detail {flex:1;min-width:0;font-size:var(--font-caption);color:var(--muted);overflow-wrap:anywhere;}
+#custom-chime-dialog {width:min(380px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;}
+#custom-chime-dialog h2 {font-size:18px;margin:0 0 20px;}
+#custom-chime-form > label {margin:12px 0 6px;}
+.time-input {display:grid;grid-template-columns:minmax(0,1fr) .4em minmax(0,1fr);align-items:center;width:4.5em;padding:4px;border:1px solid var(--border);border-radius:var(--button-radius);background:var(--surface);font-size:24px;font-variant-numeric:tabular-nums;}
+.time-input > span {color:var(--muted);text-align:center;}
+.custom-repeat {margin:16px 0;}
+.custom-repeat > .settings-section-title {margin-bottom:6px;}
+.custom-repeat .repeat-options {margin-left:0;}
+#custom-chime-dialog button:not(.sound-select-trigger) {font:inherit;font-size:var(--font-small);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--button-radius);padding:.45rem .65rem;cursor:pointer;}
+#custom-chime-dialog button:hover:not(:disabled) {background:var(--button-hover-background);}
+#custom-chime-dialog button:disabled {cursor:default;}
+#custom-chime-dialog .time-input > button {float:none;min-width:0;width:100%;padding:4px;border:0;border-radius:4px;background:transparent;font:inherit;font-size:24px;text-align:center;}
+#custom-chime-dialog .time-input > button:hover:not(:disabled),#custom-chime-dialog .time-input > button[aria-expanded='true'] {background:var(--button-hover-background);}
+#custom-chime-dialog .time-input > button:focus-visible {outline:2px solid var(--accent);outline-offset:0;}
+.time-picker {--time-wheel-row-height:38px;position:fixed;inset:auto;left:0;top:0;margin:0;width:200px;max-width:calc(100vw - 24px);padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);box-shadow:0 8px 28px #0003;}
+.time-picker:popover-open {display:grid;grid-template-columns:minmax(0,1fr) 16px minmax(0,1fr);align-items:center;}
+.time-wheel {height:calc(5 * var(--time-wheel-row-height));padding-block:calc(2 * var(--time-wheel-row-height));overflow-y:auto;overscroll-behavior:contain;scroll-snap-type:y mandatory;scrollbar-width:none;touch-action:pan-y;user-select:none;mask-image:linear-gradient(transparent,#000 35%,#000 65%,transparent);}
+.time-wheel::-webkit-scrollbar {display:none;}
+.time-wheel:focus {outline:none;}
+.time-wheel-option {height:var(--time-wheel-row-height);display:grid;place-items:center;scroll-snap-align:center;font-size:25px;font-weight:400;font-variant-numeric:tabular-nums;line-height:1;color:var(--text);cursor:pointer;}
+.time-wheel-option[data-distance='1'] {opacity:.65;transform:scale(.92);}
+.time-wheel-option[data-distance='2'] {opacity:.4;transform:scale(.82);}
+.time-wheel-option[data-distance='3'] {opacity:.15;}
+.time-wheel:focus-visible .time-wheel-option[aria-selected='true'] {color:var(--accent);}
+.time-picker-band {position:absolute;left:8px;right:8px;top:50%;transform:translateY(-50%);height:var(--time-wheel-row-height);border-block:1px solid var(--border);background:color-mix(in srgb,var(--text) 4%,transparent);border-radius:4px;pointer-events:none;}
+.time-picker-separator {font-size:24px;color:var(--muted);text-align:center;}
+.custom-chime-ring {pointer-events:none;}
+.clock-dial .custom-chime-ring circle {stroke:none;fill:var(--dot-off);}
+.clock-dial .custom-chime-ring circle[data-active='true'] {fill:var(--clock-hand-color);}
+.clock-dial[data-custom-ring='true'] > svg {overflow:visible;}
+.clock-dial[data-custom-ring='true'] {width:min(var(--dial-max-size),calc(100% - 2 * var(--dial-outer-gutter)));margin:var(--dial-outer-gutter) auto;}
+.custom-slot {position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;width:22px;height:22px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--text);cursor:pointer;z-index:2;}
+.custom-slot[hidden] {display:none;}
+.custom-slot:focus-visible {outline:2px solid var(--clock-hand-color);outline-offset:1px;}
+.custom-slot:hover,.custom-slot:focus-visible {z-index:4;}
+.custom-slot:disabled {cursor:default;}
+.clock-dial .custom-slot::before {white-space:pre;}
+.custom-slot[data-side='right']::before {left:auto;right:0;transform:none;}
+.custom-slot[data-side='left']::before {left:0;transform:none;}
+#custom-chime-dialog #custom-chime-preview {float:none;}
+:root[data-minimum='true'] .clock-dial[data-custom-ring='true'] {width:min(var(--dial-max-size),calc(100vw - 2 * var(--dial-outer-gutter)),calc(100vh - 2 * (var(--titlebar-height) + var(--dial-outer-gutter))));margin:0;}

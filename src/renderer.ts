@@ -1,5 +1,7 @@
-import volumeSvg from './icons/tabler/volume.svg?raw';
 import { BulkPopover } from './renderer/bulk-popover';
+import { CustomChimes } from './renderer/custom-chimes';
+import { RouteVolume } from './renderer/route-volume';
+import './custom-chimes.css';
 import { WindowControls } from './renderer/window-controls';
 import './index.css';
 import type { ClockStatus } from './shared/api';
@@ -23,8 +25,6 @@ import {AudioFeedback} from './audio-feedback';
 const audioFeedback=new AudioFeedback();
 const element = <T extends HTMLElement>(id: string): T =>
   document.getElementById(id) as T;
-element('volume-icon').innerHTML = volumeSvg;
-element('volume-icon').querySelector('svg')!.setAttribute('focusable', 'false');
 new WindowControls();
 const bulkPopover = new BulkPopover();
 const current = element<HTMLElement>('current');
@@ -50,8 +50,7 @@ function chooseMinimum(minimumDisplay: boolean): void {
   clockMode.setAttribute('aria-pressed', String(minimumDisplay));
   change({ minimumDisplay });
 }
-const volume = element<HTMLInputElement>('volume');
-const volumeValue = element<HTMLOutputElement>('volume-value');
+const masterVolume = new RouteVolume(element('master-volume'), value => change({volume: value}), {id:'volume', outputId:'volume-value', titleId:'volume-title', iconId:'volume-icon', label:'全体の音量', heading:true});
 const repeats = [
   ...document.querySelectorAll<HTMLInputElement>('[name="hourly-repeat"]'),
 ];
@@ -75,6 +74,28 @@ const soundControls=new SoundControls(async <T>(action:()=>Promise<T>):Promise<T
   if(lastStatus){render(lastStatus);ready();}
   const task=updates.then(action);updates=task.then(()=>{},()=>{});
   try{return await task;}finally{pending--;soundBusy=false;await refresh();}
+});
+const hourVolume = new RouteVolume(element('hour-volume'), hourVolume => change({hourVolume}));
+const halfVolume = new RouteVolume(element('half-volume'), halfHourVolume => change({halfHourVolume}));
+const customChimes = new CustomChimes(async edit => {
+  if (soundBusy || lastStatus?.soundManagement?.busy) throw new Error('音源操作が完了してから変更してください。');
+  requestVersion++; pending++;
+  const task = updates.then(async () => {
+    const current = await window.cuckoo.getStatus();
+    const result = await window.cuckoo.updateSettings(edit(current.settings));
+    const revision = result.settingsSync.revision;
+    // One write only; confirm the existing persistence worker's receipt.
+    const deadline = Date.now() + 7000;
+    while (Date.now() < deadline) {
+      const status = await window.cuckoo.getStatus();
+      if (status.settingsSync.savedRevision !== null && status.settingsSync.savedRevision >= revision) return;
+      if (status.saveState === 'error' || !status.settingsSync.canEdit) throw new Error(status.settingsNotice || '設定の保存結果を確認してください。');
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    throw new Error('保存結果を確認できません。設定の状態を確認してから再操作してください。');
+  });
+  updates = task.catch(() => {});
+  try { await task; } finally { pending--; await refresh(); }
 });
 const myPresets = new MyPresets(async (action) => {
   requestVersion++;
@@ -116,6 +137,7 @@ const dial = new ClockDial(
   element('dial'),
   (slots) => change({ slots }),
   renderPresets,
+  (minutes, enabled) => customChimes.setMinutes(minutes, enabled),
 );
 dial.setDisabled(true);
 function applyTheme(): void {
@@ -137,6 +159,10 @@ function render(status: ClockStatus, controls = false): void {
   lastStatus=status;
   editable = status.settingsSync.canEdit&&!status.soundManagement?.busy&&!soundBusy;
   soundControls.update(status);
+  customChimes.update(status);
+  dial.setCustomChimes(status.settings.customChimes ?? []);
+  hourVolume.sync(status.settings.hourVolume ?? 100, editable);
+  halfVolume.sync(status.settings.halfHourVolume ?? 100, editable);
   myPresets.setWritable(editable);
   if (pending === 0 || controls)
     requestedMinimum = status.settings.minimumDisplay;
@@ -184,8 +210,7 @@ function render(status: ClockStatus, controls = false): void {
       radio.checked = Number(radio.value) === (status.settings.halfHourlyRepeat??1);
   }
   if (pending === 0 || controls) {
-    volume.value = String(status.settings.volume);
-    volumeValue.value = `${status.settings.volume}%`;
+    masterVolume.sync(status.settings.volume, editable);
     selectedTheme = status.settings.theme;
     backgroundIllustration = status.settings.backgroundIllustration;
     applyTheme();
@@ -257,10 +282,6 @@ for (const button of presets)
     dial.setSlots(slots);
     change({ slots });
   });
-volume.addEventListener('input', () => {
-  volumeValue.value = `${volume.value}%`;
-  change({ volume: Number(volume.value) });
-});
 test.addEventListener('click', async () => {
   if (testing) return;
   testing = true;

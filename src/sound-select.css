@@ -1,8 +1,7 @@
 .sound-route select[hidden],.my-presets select[hidden] {display:none;}
-.sound-route .sound-select-trigger,.my-presets .sound-select-trigger {display:flex;align-items:center;gap:8px;width:100%;min-width:0;text-align:left;height:38px;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:var(--font-small);}
+button.sound-select-trigger {display:flex;align-items:center;gap:8px;width:100%;min-width:0;text-align:left;height:38px;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:var(--font-small);}
 .my-presets .sound-select-trigger {flex:1;}
-.my-presets .sound-select-trigger:hover:not(:disabled),.sound-route .sound-select-trigger:hover:not(:disabled) {background:var(--button-hover-background);}
-.my-presets .sound-select-trigger:disabled,.sound-route .sound-select-trigger:disabled {opacity:.55;}
+button.sound-select-trigger:hover:not(:disabled) {background:var(--button-hover-background);}
 .sound-select-trigger svg,.sound-select-option svg {width:18px;height:18px;flex:0 0 18px;}
 .sound-select-name {display:block;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .sound-select-chevron,.sound-select-check {flex:0 0 14px;text-align:center;}

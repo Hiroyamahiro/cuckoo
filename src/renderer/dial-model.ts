@@ -11,6 +11,9 @@ export function applyBulkSlots(slots: readonly boolean[], ring: Ring, action: Bu
 }
 export const dialSize = 520;
 export const dialCenter = dialSize / 2;
+export const customRingDots = 120;
+// SVG coordinate radius; 8 larger than the previous dialCenter - 6.
+export const customRingRadius = dialCenter + 2;
 export function point(hour: number, radius: number): { x: number; y: number } {
   const angle = ((timeAngle(hour * 3600) - 90) / 180) * Math.PI;
   return {

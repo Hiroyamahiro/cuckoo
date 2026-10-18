@@ -10,6 +10,9 @@
   --font-family: 'Urbanist', 'Yu Gothic UI', 'Segoe UI', sans-serif;
   --titlebar-height: 32px;
   --dial-max-size: 500px;
+  --dial-outer-gutter: 24px;
+  --volume-control-width: 240px;
+  --clock-hand-color: #c76b68;
   color-scheme: light;
   --font-medium: 16px;
   --font-small: 13px;

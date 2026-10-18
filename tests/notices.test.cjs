@@ -34,7 +34,7 @@ test('offline notices have complete local references and no external resources',
 
 test('bundled Urbanist notices preserve the copyright and full OFL text',async()=>{
  const {escapeHtml}=await import('../scripts/generate-notices.mjs');
- const html=fs.readFileSync(path.join(root,'src/public/THIRD-PARTY-NOTICES.html'),'utf8');
+ const html=fs.readFileSync(path.join(root,'src/public/THIRD-PARTY-NOTICES.html'),'utf8').replace(/\r\n?/g,'\n');
  const text=fs.readFileSync(path.join(root,'src/fonts/urbanist/OFL.txt'),'utf8').replace(/\r\n?/g,'\n').trim();
  const escaped=escapeHtml(text);
  assert.ok(html.includes(escaped));
