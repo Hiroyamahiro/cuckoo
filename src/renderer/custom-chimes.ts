@@ -7,6 +7,7 @@ import { SoundSelect } from './sound-select';
 import { VoicevoxControls } from './voicevox-controls';
 import {speechName} from '../shared/voicevox';
 import {renderVoicevoxCredits} from './voicevox-credits';
+import {trashIcon} from './trash-icon';
 import { previewBlocked, previewLabel } from '../preview-client';
 import { soundError } from '../sound-client';
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -86,7 +87,7 @@ export class CustomChimes {
       const name=chime.speech ? speechName(chime.speech) : source?.name ?? '音色を確認中';
       details.textContent = `${name} · ${chime.repeat}回 · ${chime.volume}%`;
       if (source && !source.available) details.textContent += '（利用不能）';
-      const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '削除'; remove.disabled = !writable;
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'sound-remove'; remove.append(trashIcon()); remove.title = '削除'; remove.disabled = !writable;
       remove.setAttribute('aria-label', `${chimeTime(chime.minute)}の時報を削除`);
       remove.addEventListener('click', () => void this.act(s => ({customChimes: s.customChimes.filter(c => c.id !== chime.id)})));
       const preview = document.createElement('button'); preview.type='button'; preview.className='sound-preview';

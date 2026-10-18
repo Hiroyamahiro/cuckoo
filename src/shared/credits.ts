@@ -6,4 +6,4 @@ export const creditLinks = {
   zundamon: 'https://zunko.jp/con_ongen_kiyaku.html',
   himari: 'https://www.meimeihimari.com/terms-of-use',
 } as const;
-export type CreditLink = keyof typeof creditLinks | 'notices';
+export type CreditLink = keyof typeof creditLinks | 'notices' | `voicevox-policy:${string}`;

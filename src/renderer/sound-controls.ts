@@ -1,3 +1,4 @@
+import {trashIcon} from './trash-icon';
 import type {ClockStatus,SoundAction,SoundSource} from '../shared/api';
 import {soundError} from '../sound-client';
 import {previewBlocked,previewLabel,previewMessage} from '../preview-client';
@@ -16,6 +17,16 @@ export class SoundControls {
   const dialog=el<HTMLDialogElement>('sound-rename-dialog');
   el('sound-rename-cancel').addEventListener('click',()=>{if(!this.busy)dialog.close();});
   dialog.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});
+  const removal=el<HTMLDialogElement>('sound-remove-dialog');
+  el('sound-remove-cancel').addEventListener('click',()=>{if(!this.busy)removal.close();});
+  removal.addEventListener('cancel',event=>{if(this.busy)event.preventDefault();});
+  el('sound-remove-form').addEventListener('submit',event=>{
+   event.preventDefault();if(this.busy||el<HTMLButtonElement>('sound-remove-confirm').disabled)return;
+   el('sound-remove-error').textContent='';
+   void this.perform({type:'unregister',id:removal.dataset.soundId!}).then(saved=>{
+    if(saved)removal.close();else el('sound-remove-error').textContent=this.error.textContent||'登録解除を確認できません。「保存結果を確認」で確認してください。';
+   });
+  });
   el('sound-rename-form').addEventListener('submit',event=>{event.preventDefault();if(this.busy)return;const name=el<HTMLInputElement>('sound-rename-name').value.trim();if(!name){el('sound-rename-error').textContent='登録名を入力してください。';return;}void this.perform({type:'rename',id:dialog.dataset.soundId!,name}).then(saved=>{if(saved)dialog.close();else el('sound-rename-error').textContent=this.error.textContent;});});
   el('sound-refresh').addEventListener('click',()=>void this.refresh());
   el('sound-confirm').addEventListener('click',()=>void this.perform());
@@ -58,6 +69,11 @@ export class SoundControls {
   el<HTMLButtonElement>('sound-register').disabled=!writable;
   for(const id of ['sound-rename-name','sound-rename-save'])el<HTMLInputElement>(id).disabled=!writable;
   el<HTMLButtonElement>('sound-rename-cancel').disabled=this.busy;
+  const removal=el<HTMLDialogElement>('sound-remove-dialog');
+  const removing=removal.dataset.soundId;
+  const removalBlocked=!this.sources.some(source=>source.id===removing)||s.settings.customChimes.some(chime=>chime.soundId===removing)||routing?.onHour.soundId===removing||routing?.onHalfHour.soundId===removing||!!this.sources.find(source=>source.id===removing)?.pinned;
+  el<HTMLButtonElement>('sound-remove-confirm').disabled=!writable||removalBlocked;
+  el<HTMLButtonElement>('sound-remove-cancel').disabled=this.busy;
   const list=el('custom-sounds');const rows=this.sources.filter(x=>x.kind==='custom');el('sound-empty').hidden=rows.length>0;
   // Replace rows only when their meaningful state changes; retain focused buttons.
   const signature=JSON.stringify(rows.map(x=>[x.id,x.name,x.available,x.pinned]))+JSON.stringify(routing)+JSON.stringify(s.settings.customChimes)+String(writable)+String(this.busy)+String(previewBlocked(s))+JSON.stringify(s.audio?.preview)+JSON.stringify(s.audio?.active);
@@ -72,7 +88,11 @@ export class SoundControls {
    if(!source.available)detail.setAttribute('role','alert');
    const preview=document.createElement('button');preview.type='button';preview.textContent=previewLabel(s,source.id,'試聴');preview.dataset.action='preview';preview.disabled=!source.available||this.busy||previewBlocked(s);preview.addEventListener('click',()=>void this.preview('one',source.id));
    const remove=document.createElement('button');remove.type='button';remove.className='sound-remove';remove.title=selected?`${selected}で使用中。先に別の音源を選んでください。`:playing?'再生準備・再生中のため解除できません。':'登録解除';remove.setAttribute('aria-label',source.name+'の登録を解除');
-   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');const trash=document.createElementNS(svg.namespaceURI,'path');trash.setAttribute('d','M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7');svg.append(trash);remove.append(svg);remove.dataset.action='unregister';remove.disabled=!writable||!!selected||!!playing;remove.addEventListener('click',()=>{if(window.confirm(`「${source.name}」の登録を解除しますか？ 音源ファイルは復旧用に保持されます。`))void this.perform({type:'unregister',id:source.id});});
+   remove.append(trashIcon());remove.dataset.action='unregister';remove.disabled=!writable||!!selected||!!playing;remove.addEventListener('click',()=>{
+    removal.dataset.soundId=source.id;
+    el('sound-remove-description').textContent=`「${source.name}」の登録を解除しますか？`;
+    el('sound-remove-error').textContent='';this.paint();removal.showModal();
+   });
    const rename=document.createElement('button');rename.type='button';rename.textContent='登録名を変更';rename.dataset.action='rename';rename.disabled=!writable;rename.addEventListener('click',()=>{const dialog=el<HTMLDialogElement>('sound-rename-dialog');dialog.dataset.soundId=source.id;el<HTMLInputElement>('sound-rename-name').value=source.name;el('sound-rename-error').textContent='';dialog.showModal();el<HTMLInputElement>('sound-rename-name').select();});
    li.append(name,detail,preview,rename,remove);return li;
   }));}

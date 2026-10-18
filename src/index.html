@@ -292,7 +292,7 @@
           <div class="chime-field"><label class="settings-section-title" for="voicevox-character">音声キャラクター</label><select id="voicevox-character"></select></div>
           <div class="chime-field"><label class="settings-section-title" for="voicevox-style">音声スタイル</label><select id="voicevox-style"></select></div>
           <p id="voicevox-selection" class="description"></p>
-          <details id="voicevox-policy"><summary>音声ライブラリの利用規約・クレジット</summary><p id="voicevox-policy-status" role="status"></p><p id="voicevox-policy-text"></p></details>
+          <details id="voicevox-policy"><summary>音声ライブラリの利用規約・クレジット</summary><div id="voicevox-policy-content"></div></details>
           <div class="chime-field"><label class="settings-section-title" for="voicevox-mode">読み上げモード</label><select id="voicevox-mode"><option value="time">時刻のみ</option><option value="time-text">時刻＋自由セリフ</option><option value="text">自由セリフのみ</option></select></div>
           <div id="voicevox-text-field" class="chime-field" hidden><label class="settings-section-title" for="voicevox-text">自由セリフ</label><textarea id="voicevox-text" rows="3" maxlength="1000"></textarea></div>
           <p id="voicevox-status" class="description" role="status" aria-live="polite"></p>
@@ -305,6 +305,14 @@
         <button id="custom-chime-preview" class="sound-preview" type="button">試聴</button>
         <p id="custom-chime-error" class="sound-warning" role="alert"></p>
         <div class="preset-dialog-buttons"><button id="custom-chime-cancel" type="button">キャンセル</button><button id="custom-chime-save" type="submit">保存</button></div>
+      </form>
+    </dialog>
+    <dialog id="sound-remove-dialog" class="credits" aria-labelledby="sound-remove-title" aria-describedby="sound-remove-description">
+      <form id="sound-remove-form">
+        <h2 id="sound-remove-title">音色の登録解除</h2>
+        <p id="sound-remove-description"></p>
+        <p id="sound-remove-error" role="alert"></p>
+        <div class="preset-dialog-buttons"><button id="sound-remove-cancel" type="button" autofocus>キャンセル</button><button id="sound-remove-confirm" type="submit">登録解除</button></div>
       </form>
     </dialog>
     <dialog id="sound-rename-dialog" class="credits" aria-labelledby="sound-rename-title">

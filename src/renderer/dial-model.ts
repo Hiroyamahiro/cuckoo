@@ -22,7 +22,7 @@ export function point(hour: number, radius: number): { x: number; y: number } {
   };
 }
 export function ringRadius(ring: Ring): number {
-  return ring === 0 ? 184 : 234;
+  return ring === 0 ? 184 : 230;
 }
 export function hitHour(x: number, y: number, ring: Ring): number | null {
   const dx = x - dialCenter;

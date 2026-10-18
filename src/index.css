@@ -75,6 +75,7 @@ h1 {
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+/* 00分ドットの当たり判定 */
 .slot {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -96,6 +97,12 @@ h1 {
   width: 14px;
   height: 14px;
   transition: background 100ms;
+}
+/* 30分ドットの当たり判定 */
+.slot.half-hourly {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
 }
 .slot.half-hourly::after {
   width: 7px;

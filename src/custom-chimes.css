@@ -40,7 +40,8 @@
 .voicevox-guide p {margin:10px 0;}
 #voicevox-search {width:100%;min-width:0;padding:8px;font:inherit;font-size:var(--font-small);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--button-radius);}
 #voicevox-policy summary {cursor:pointer;}
-#voicevox-policy-text,.voicevox-credit-policy {white-space:pre-wrap;overflow-wrap:anywhere;max-height:14rem;overflow:auto;font-size:var(--font-small);}
+.voicevox-credit-policy {white-space:pre-wrap;overflow-wrap:anywhere;max-height:14rem;overflow:auto;font-size:var(--font-small);}
+#voicevox-policy-content p {margin:4px 0 0;}
 #voicevox-text {display:block;width:100%;resize:vertical;min-height:5em;padding:8px;font:inherit;font-size:var(--font-small);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--button-radius);}
 #voicevox-status {white-space:normal;overflow-wrap:anywhere;}
 #voicevox-status:empty {display:none;}

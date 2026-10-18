@@ -1,5 +1,6 @@
 import {CustomSelect} from './sound-select';
 import {voicevoxThumbnail} from './voicevox-thumbnails';
+import {renderVoicevoxPolicy} from './voicevox-policy';
 import {legacyVoicevoxCharacters,speechName,speechSignature,type Speech,type VoicevoxCharacter} from '../shared/voicevox';
 export class VoicevoxControls {
   private host=document.getElementById('voicevox-controls')!;
@@ -14,7 +15,6 @@ export class VoicevoxControls {
   private loading=false;
   private request=0;
   private policyRequest=0;
-  private policyState:'idle'|'saved'|'loading'|'ready'|'failed'='idle';
   private text=document.getElementById('voicevox-text') as HTMLTextAreaElement;
   private message=document.getElementById('voicevox-status')!;
   private selects:CustomSelect[];
@@ -43,7 +43,7 @@ export class VoicevoxControls {
   }
   private choose(speaker:VoicevoxCharacter,id:number):void{
     const style=speaker.styles.find(s=>s.id===id);if(!style)return;
-    if(this.voice?.character!==speaker.uuid){this.policyRequest++;this.policyState='idle';}
+    if(this.voice?.character!==speaker.uuid){this.policyRequest++;}
     this.voice={character:speaker.uuid,styleId:id,characterName:speaker.name,styleName:style.name,policy:this.voice?.character===speaker.uuid?this.voice.policy:undefined};
   }
   private renderChoices():void{
@@ -73,9 +73,9 @@ export class VoicevoxControls {
   private async loadPolicy():Promise<void>{
     const voice=this.voice;if(!voice||voice.styleId===undefined)return;
     const request=++this.policyRequest;
-    this.policyState='loading';this.sync();
-    try {const policy=await window.cuckoo.voicevoxPolicy(voice.character);if(!policy.trim())throw new Error('EmptyVoicevoxPolicy');if(request===this.policyRequest&&this.voice?.character===voice.character){this.voice.policy=policy;this.policyState='ready';this.sync();}}
-    catch{if(request===this.policyRequest){this.policyState='failed';this.sync();}}
+    this.sync();
+    try {const policy=await window.cuckoo.voicevoxPolicy(voice.character);if(!policy.trim())throw new Error('EmptyVoicevoxPolicy');if(request===this.policyRequest&&this.voice?.character===voice.character){this.voice.policy=policy;this.sync();}}
+    catch{if(request===this.policyRequest){this.sync();}}
   }
   get visible():boolean{return !this.host.hidden;}
   get busy():boolean{return !!this.pending;}
@@ -86,7 +86,7 @@ export class VoicevoxControls {
   configure(speech?:Speech,soundId?:string,clips?:Record<string,string>):void {
     this.request++;this.policyRequest++;this.loading=false;this.search.value='';this.guide.hidden=true;
     this.voice=speech?{character:speech.character,styleId:speech.styleId,characterName:speech.characterName,styleName:speech.styleName,policy:speech.policy}:undefined;
-    this.policyState=speech?.policy?.trim()?'saved':'idle';
+    (document.getElementById('voicevox-policy') as HTMLDetailsElement).open=false;
     this.mode.value=speech?.mode??'time';this.text.value=speech?.text??'';
     this.generated=speech&&(soundId||clips)?{signature:this.signature(speech),clips:clips??{[this.minute()]:soundId!},verified:false}:undefined;
     void this.protect(Object.values(this.generated?.clips??{})).catch(()=>{});
@@ -101,8 +101,7 @@ export class VoicevoxControls {
     document.getElementById('voicevox-text-field')!.hidden=this.mode.value==='time';
     this.host.setAttribute('aria-busy',String(busy));this.selects.forEach(s=>s.sync());this.changed();
     document.getElementById('voicevox-selection')!.textContent=this.voice?speechName(this.value):'キャラクターを選択してください';
-    document.getElementById('voicevox-policy-text')!.textContent=this.voice?.policy?.trim()||(this.voice?.styleId===undefined?legacyVoicevoxCharacters.find(c=>c.id===this.voice?.character)?.terms??'':'');
-    document.getElementById('voicevox-policy-status')!.textContent=this.policyState==='failed'?`利用規約を取得できません。${this.voice?.policy?.trim()?'保存済みの本文を表示しています。':''}一覧を更新して再試行してください。`:this.policyState==='loading'?'利用規約を確認しています…':this.policyState==='saved'?'保存済みの利用規約':'';
+    renderVoicevoxPolicy(document.getElementById('voicevox-policy-content')!,this.voice);
   }
   async ensure():Promise<string>{
     if(this.pending)return this.pending;
@@ -114,7 +113,7 @@ export class VoicevoxControls {
       if(speech.styleId!==undefined&&!speech.policy&&this.generated?.signature!==signature){
         speech.policy=await window.cuckoo.voicevoxPolicy(speech.character);
         if(!speech.policy.trim())throw new Error('利用規約を取得できません。一覧を更新して再試行してください。');
-        if(this.voice?.character===speech.character){this.voice.policy=speech.policy;this.policyState='ready';}
+        if(this.voice?.character===speech.character){this.voice.policy=speech.policy;}
       }
       const clips:Record<string,string>={},unique=new Map<string,string>();
       for(const [index,minute] of minutes.entries()){

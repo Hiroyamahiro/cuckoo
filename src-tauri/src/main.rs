@@ -150,7 +150,7 @@ async fn open_credit(
         builder.build().map_err(|e| e.to_string())?;
         return Ok(());
     }
-    external_links::target(&link)?;
+    external_links::resolve(&link)?;
     tauri::async_runtime::spawn_blocking(move || external_links::open(&link))
         .await
         .map_err(|e| e.to_string())?
